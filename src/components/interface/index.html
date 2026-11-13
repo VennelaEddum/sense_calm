@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#FCEFF2">
+    <title>SenseCalm | Meet Bebbo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- FIRST-TIME WELCOME SCREEN -->
+    <section class="welcome-screen" id="welcomeScreen" hidden>
+        <div class="welcome-card">
+            <div class="welcome-heart">♡</div>
+
+            <div class="mini-bebbo" aria-hidden="true">
+                <div class="mini-ear mini-ear-left"></div>
+                <div class="mini-ear mini-ear-right"></div>
+                <div class="mini-face">
+                    <span class="mini-eye mini-eye-left"></span>
+                    <span class="mini-eye mini-eye-right"></span>
+                    <span class="mini-nose"></span>
+                </div>
+                <div class="mini-body"></div>
+                <div class="mini-foot mini-foot-left"></div>
+                <div class="mini-foot mini-foot-right"></div>
+            </div>
+
+            <p class="welcome-eyebrow">A LITTLE SPACE JUST FOR YOU</p>
+            <h1>Welcome to SenseCalm!</h1>
+            <p class="welcome-message">
+                I'm Bebbo! Before we begin, what should I call you?
+            </p>
+
+            <form id="welcomeForm">
+                <label for="visitorName">Your name</label>
+                <input
+                    type="text"
+                    id="visitorName"
+                    placeholder="Enter your name..."
+                    maxlength="30"
+                    autocomplete="given-name"
+                    required
+                >
+                <button type="submit" class="welcome-submit">
+                    Let's begin ♡
+                </button>
+            </form>
+
+            <p class="welcome-small">
+                You only need to do this once on this device.
+            </p>
+        </div>
+    </section>
+
+
+    <!-- NAVIGATION -->
+    <header class="navbar">
+        <a href="index.html" class="logo">
+            ♡ Sense<span>Calm</span>
+        </a>
+
+        <nav aria-label="Main navigation">
+            <a href="index.html" class="nav-link active">Home</a>
+            <a href="activities.html" class="nav-link">Activities</a>
+        </nav>
+
+        <button
+            class="settings-btn"
+            id="settingsBtn"
+            type="button"
+            aria-pressed="false"
+        >
+            ☁ Quiet Mode: Off
+        </button>
+    </header>
+
+
+    <!-- HOME PAGE -->
+    <main class="home-page">
+
+        <section class="hero-section">
+
+            <div class="bunny-area">
+
+                <div class="speech-bubble" id="homeSpeech" hidden>
+                    <span id="homeGreeting">
+                        Hello! Welcome to SenseCalm!
+                    </span>
+                    <span class="bubble-heart">♡</span>
+                </div>
+
+                <div class="click-hint">
+                    <span>Click me!</span>
+                    <span class="hint-arrow">↘</span>
+                </div>
+
+                <!-- BEBBO THE RABBIT -->
+                <button
+                    class="bunny"
+                    id="homeBunny"
+                    type="button"
+                    aria-label="Click Bebbo to hear a greeting"
+                    aria-expanded="false"
+                >
+                    <span class="ear left-ear"></span>
+                    <span class="ear right-ear"></span>
+
+                    <span class="bunny-head">
+                        <span class="eye eye-left"></span>
+                        <span class="eye eye-right"></span>
+                        <span class="nose"></span>
+                        <span class="mouth"></span>
+                        <span class="cheek cheek-left"></span>
+                        <span class="cheek cheek-right"></span>
+                    </span>
+
+                    <span class="bunny-body"></span>
+                    <span class="bunny-arm arm-left"></span>
+                    <span class="bunny-arm arm-right"></span>
+                    <span class="bunny-foot foot-left"></span>
+                    <span class="bunny-foot foot-right"></span>
+                    <span class="bunny-tail"></span>
+                </button>
+
+                <div class="ground-shadow"></div>
+            </div>
+
+            <p class="welcome-label">A LITTLE SPACE JUST FOR YOU</p>
+
+            <h1>
+                Hello, Little Explorer! <span class="pink-heart">♡</span>
+            </h1>
+
+            <p class="home-description">
+                Learn, play and grow at your own pace.
+                Every little step is special!
+            </p>
+
+            <section class="comfort-card">
+                <span class="comfort-icon">🌷</span>
+                <div>
+                    <h2>Take your time, buddy!</h2>
+                    <p>There is no hurry. You can learn at your own pace.</p>
+                </div>
+            </section>
+
+            <a href="activities.html" class="explore-button">
+                Explore Activities <span>→</span>
+            </a>
+
+            <p class="bottom-note">
+                Made with love, just for you ♡
+            </p>
+
+        </section>
+    </main>
+
+    <footer>
+        SenseCalm © 2026 · A gentle space to grow.
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#FCEFF2">
+    <title>SenseCalm | Activities</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- NAVIGATION -->
+    <header class="navbar">
+        <a href="index.html" class="logo">
+            ♡ Sense<span>Calm</span>
+        </a>
+
+        <nav aria-label="Main navigation">
+            <a href="index.html" class="nav-link">Home</a>
+            <a href="activities.html" class="nav-link active">Activities</a>
+        </nav>
+
+        <button
+            class="settings-btn"
+            id="settingsBtn"
+            type="button"
+            aria-pressed="false"
+        >
+            ☁ Quiet Mode: Off
+        </button>
+    </header>
+
+
+    <!-- ACTIVITIES PAGE -->
+    <main class="activities-page">
+
+        <section class="activities-hero">
+
+            <div class="bunny-area activities-bunny-area">
+
+                <div class="speech-bubble" id="activitiesSpeech" hidden>
+                    <span id="activitiesGreeting">
+                        Hello, buddy! What shall we do today?
+                    </span>
+                    <span class="bubble-heart">♡</span>
+                </div>
+
+                <div class="click-hint">
+                    <span>Click me!</span>
+                    <span class="hint-arrow">↘</span>
+                </div>
+
+                <!-- BEBBO THE RABBIT -->
+                <button
+                    class="bunny"
+                    id="activitiesBunny"
+                    type="button"
+                    aria-label="Click Bebbo to hear a greeting"
+                    aria-expanded="false"
+                >
+                    <span class="ear left-ear"></span>
+                    <span class="ear right-ear"></span>
+
+                    <span class="bunny-head">
+                        <span class="eye eye-left"></span>
+                        <span class="eye eye-right"></span>
+                        <span class="nose"></span>
+                        <span class="mouth"></span>
+                        <span class="cheek cheek-left"></span>
+                        <span class="cheek cheek-right"></span>
+                    </span>
+
+                    <span class="bunny-body"></span>
+                    <span class="bunny-arm arm-left"></span>
+                    <span class="bunny-arm arm-right"></span>
+                    <span class="bunny-foot foot-left"></span>
+                    <span class="bunny-foot foot-right"></span>
+                    <span class="bunny-tail"></span>
+                </button>
+
+                <div class="ground-shadow"></div>
+            </div>
+
+            <p class="welcome-label">YOUR HAPPY LITTLE SPACE</p>
+
+            <h1 class="activities-heading">
+                Pick something you like, buddy! <span>♡</span>
+            </h1>
+
+            <p class="page-description">
+                Choose an activity and let's have some fun!
+            </p>
+
+        </section>
+
+
+        <!-- ACTIVITY CARDS -->
+        <section class="activity-grid">
+
+            <article
+                class="activity-card fundamentals-card"
+                tabindex="0"
+                role="button"
+                aria-label="Everyday Fundamentals"
+            >
+                <span class="activity-number">01</span>
+                <div class="activity-icon">🌱</div>
+                <h2>Everyday Fundamentals</h2>
+                <p>Explore colours, shapes, numbers and more!</p>
+                <span class="card-link">Let's learn →</span>
+            </article>
+
+            <article
+                class="activity-card games-card"
+                tabindex="0"
+                role="button"
+                aria-label="Interactive Games"
+            >
+                <span class="activity-number">02</span>
+                <div class="activity-icon">🎨</div>
+                <h2>Interactive Games</h2>
+                <p>Play, match and discover something new!</p>
+                <span class="card-link">Let's play →</span>
+            </article>
+
+            <article
+                class="activity-card routines-card"
+                tabindex="0"
+                role="button"
+                aria-label="Daily Routines and Progress"
+            >
+                <span class="activity-number">03</span>
+                <div class="activity-icon">🌷</div>
+                <h2>Daily Routines + Progress</h2>
+                <p>Build little habits and celebrate your wins!</p>
+                <span class="card-link">Let's begin →</span>
+            </article>
+
+        </section>
+
+
+        <div class="activities-reminder">
+            <span>♡</span>
+            You can take a break whenever you need, buddy!
+        </div>
+
+        <a href="index.html" class="back-link">
+            ← Back to Home
+        </a>
+
+    </main>
+
+    <footer>
+        SenseCalm © 2026 · A gentle space to grow.
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

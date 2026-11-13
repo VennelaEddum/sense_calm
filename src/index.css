@@ -1,0 +1,320 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Caveat:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #FCEFF2;
+  --cream: #FFF9F5;
+  --pink: #F5DCE3;
+  --pink-dark: #C9879C;
+  --blue: #E5EFF7;
+  --green: #B9D5B9;
+  --marigold: #EBCB79;
+  --terracotta: #D99B7F;
+  --sage: #66836D;
+  --sage-light: #718D75;
+  --text: #494A48;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Nunito', 'Trebuchet MS', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.font-serif-display {
+  font-family: 'Nunito', serif;
+}
+
+.font-script {
+  font-family: 'Caveat', cursive;
+}
+
+/* ===== Bebbo the Rabbit ===== */
+.bebbo-button {
+  position: relative;
+  display: block;
+  width: 180px;
+  height: 260px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: 50% 85%;
+  transition: transform 0.2s ease;
+}
+
+.bebbo-button:hover {
+  transform: translateY(-4px);
+}
+
+.bebbo-button:focus-visible {
+  outline: 3px solid #B98798;
+  outline-offset: 8px;
+  border-radius: 50%;
+}
+
+.bebbo-ear {
+  position: absolute;
+  top: 4px;
+  width: 43px;
+  height: 112px;
+  background: #FFFEFC;
+  border: 1px solid #E9E0DD;
+  border-radius: 50% 50% 42% 42%;
+  z-index: 1;
+  transform-origin: bottom center;
+}
+
+.bebbo-ear.left { left: 42px; transform: rotate(-13deg); }
+.bebbo-ear.right { right: 42px; transform: rotate(13deg); }
+
+.bebbo-ear::after {
+  content: '';
+  position: absolute;
+  top: 12px; left: 10px;
+  width: 21px; height: 83px;
+  background: #F2C9D3;
+  border-radius: 50%;
+}
+
+.bebbo-head {
+  position: absolute;
+  top: 62px; left: 27px;
+  width: 126px; height: 112px;
+  background: #FFFEFC;
+  border: 1px solid #E8E0DC;
+  border-radius: 48% 48% 46% 46%;
+  z-index: 3;
+}
+
+.bebbo-eye {
+  position: absolute;
+  top: 43px;
+  width: 8px; height: 11px;
+  background: #504844;
+  border-radius: 50%;
+}
+.bebbo-eye.left { left: 35px; }
+.bebbo-eye.right { right: 35px; }
+
+.bebbo-nose {
+  position: absolute;
+  top: 61px; left: 57px;
+  width: 12px; height: 9px;
+  background: #D88FA2;
+  border-radius: 50% 50% 55% 55%;
+}
+
+.bebbo-mouth {
+  position: absolute;
+  top: 69px; left: 59px;
+  width: 9px; height: 8px;
+  border-bottom: 2px solid #79645F;
+  border-radius: 50%;
+}
+
+.bebbo-cheek {
+  position: absolute;
+  top: 64px;
+  width: 17px; height: 9px;
+  background: #F5D5D9;
+  border-radius: 50%;
+  opacity: 0.85;
+}
+.bebbo-cheek.left { left: 12px; }
+.bebbo-cheek.right { right: 12px; }
+
+.bebbo-body {
+  position: absolute;
+  top: 157px; left: 45px;
+  width: 90px; height: 88px;
+  background: #FFFEFC;
+  border: 1px solid #E8E0DC;
+  border-radius: 48% 48% 40% 40%;
+  z-index: 2;
+}
+
+.bebbo-body::after {
+  content: '';
+  position: absolute;
+  top: 16px; left: 25px;
+  width: 40px; height: 54px;
+  background: #F9F0EC;
+  border-radius: 50%;
+}
+
+.bebbo-arm {
+  position: absolute;
+  top: 172px;
+  width: 29px; height: 65px;
+  background: #FFFEFC;
+  border: 1px solid #E8E0DC;
+  border-radius: 50%;
+  z-index: 3;
+}
+.bebbo-arm.left { left: 26px; transform: rotate(25deg); }
+.bebbo-arm.right { right: 26px; transform: rotate(-25deg); }
+
+.bebbo-foot {
+  position: absolute;
+  top: 226px;
+  width: 47px; height: 29px;
+  background: #FFFEFC;
+  border: 1px solid #E8E0DC;
+  border-radius: 50%;
+  z-index: 4;
+}
+.bebbo-foot.left { left: 39px; }
+.bebbo-foot.right { right: 39px; }
+
+.bebbo-tail {
+  position: absolute;
+  top: 185px; right: 5px;
+  width: 27px; height: 27px;
+  background: #FFFEFC;
+  border: 1px solid #E8E0DC;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.bebbo-ground-shadow {
+  position: absolute;
+  bottom: 10px; left: 50%;
+  width: 150px; height: 18px;
+  background: rgba(130, 110, 105, 0.12);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+/* ===== Animations ===== */
+@keyframes bebboDance {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  20% { transform: rotate(-9deg) translateY(-9px); }
+  40% { transform: rotate(9deg) translateY(-13px); }
+  60% { transform: rotate(-7deg) translateY(-7px); }
+  80% { transform: rotate(7deg) translateY(-4px); }
+}
+
+.bebbo-button.dancing {
+  animation: bebboDance 0.85s ease-in-out;
+}
+
+@keyframes hintFloat {
+  0%, 100% { transform: translateY(0) rotate(-7deg); }
+  50% { transform: translateY(-6px) rotate(-7deg); }
+}
+
+.hint-float {
+  animation: hintFloat 2.5s ease-in-out infinite;
+}
+
+@keyframes bubbleAppear {
+  from { opacity: 0; transform: translate(-50%, 8px) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.bubble-appear {
+  animation: bubbleAppear 0.35s ease-out;
+}
+
+@keyframes cardBounce {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-9px); }
+  70% { transform: translateY(2px); }
+}
+
+.card-bounce {
+  animation: cardBounce 0.55s ease;
+}
+
+@keyframes floatUp {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float-up {
+  animation: floatUp 0.5s ease-out;
+}
+
+@keyframes confettiFall {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(400px) rotate(720deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(113, 141, 117, 0.3); }
+  50% { box-shadow: 0 0 0 12px rgba(113, 141, 117, 0); }
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes gentle-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.gentle-bob {
+  animation: gentle-bob 3s ease-in-out infinite;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+/* ===== Quiet mode & reduced motion ===== */
+.quiet-mode *,
+.quiet-mode *::before,
+.quiet-mode *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: var(--cream); }
+::-webkit-scrollbar-thumb { background: #D5C5C9; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #C4B0B5; }
+
+/* ===== Focus visibility ===== */
+:focus-visible {
+  outline: 3px solid #A97889;
+  outline-offset: 4px;
+}
