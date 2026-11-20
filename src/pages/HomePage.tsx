@@ -8,9 +8,15 @@ interface HomePageProps {
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
-  const { visitorName } = useApp();
+  const { visitorName, preferences } = useApp();
 
-  const greeting = visitorName
+  const isTelugu = preferences.ttsLanguage === "te";
+
+  const greeting = isTelugu
+    ? visitorName
+      ? `నమస్కారం ${visitorName}! సెన్స్ కామ్ కు స్వాగతం! నేను బెబ్బోని! ♡`
+      : "నమస్కారం నేస్తం! సెన్స్ కామ్ కు స్వాగతం! ♡"
+    : visitorName
     ? `Hello ${visitorName}! Welcome to SenseCalm! I'm Bebbo! ♡`
     : "Hello, buddy! Welcome to SenseCalm! ♡";
 

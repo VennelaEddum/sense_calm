@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { routineItems } from "@/data/learningData";
+import Confetti from "@/components/Confetti";
 import { CalendarCheck, Save, Check } from "lucide-react";
 
 export default function RoutinePage() {
-  const { routines, todayKey, saveRoutines, recordActivity, showNotice } = useApp();
+  const { routines, todayKey, saveRoutines, showNotice, playSound } = useApp();
+  const [celebrate, setCelebrate] = useState(false);
   const todayRoutine = routines[todayKey] || [];
 
   const handleToggle = (index: number) => {
@@ -11,17 +14,24 @@ export default function RoutinePage() {
       ? todayRoutine.filter((i) => i !== index)
       : [...todayRoutine, index];
     saveRoutines(todayKey, current);
+    playSound("pop");
   };
 
   const handleSave = () => {
-    recordActivity("Daily routine");
+    saveRoutines(todayKey, todayRoutine);
     showNotice("Your routine has been saved. Well done! ♡");
+    playSound("chime");
+    if (todayRoutine.length === routineItems.length) {
+      setCelebrate(true);
+      window.setTimeout(() => setCelebrate(false), 2500);
+    }
   };
 
   const completedCount = todayRoutine.length;
 
   return (
     <div className="w-full flex-1 px-5 py-8 max-w-[600px] mx-auto">
+      <Confetti active={celebrate} />
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#D99B7F] rounded-full text-white font-bold text-sm mb-3">
           <CalendarCheck size={18} /> Daily Routines
