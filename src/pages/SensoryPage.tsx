@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import type { Preferences } from "@/types";
-import { Settings2, Volume2, VolumeX, Eye, Sparkles, Leaf, ArrowLeft } from "lucide-react";
+import { Settings2, Volume2, VolumeX, Eye, Sparkles, Leaf, ArrowLeft, VolumeOff } from "lucide-react";
 
 interface ToggleProps {
   checked: boolean;
@@ -115,6 +115,13 @@ export default function SensoryPage() {
           label="Quiet Mode"
           description="Turns off all animations and transitions at once."
           icon={Leaf}
+        />
+        <SettingToggle
+          checked={local.silentMode}
+          onChange={(v) => setLocal({ ...local, silentMode: v })}
+          label="Silent Mode"
+          description="Mutes ALL audio (speech, sounds). Visual notifications and animations still work normally."
+          icon={VolumeOff}
         />
       </div>
 

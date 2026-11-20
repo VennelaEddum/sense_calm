@@ -1,6 +1,8 @@
 import { useApp } from "@/context/AppContext";
-import { routineItems } from "@/data/learningData";
-import { BarChart3, Download, Award, MessageCircle, Sprout, CalendarCheck, Target } from "lucide-react";
+import { routineItems, milestoneBadges } from "@/data/learningData";
+import StreakDisplay from "@/components/StreakDisplay";
+import WeeklyCalendar from "@/components/WeeklyCalendar";
+import { BarChart3, Download, Award, MessageCircle, Sprout, CalendarCheck, Target, Gamepad2, Star, Flame, Trophy } from "lucide-react";
 
 export default function ProgressPage() {
   const { progress, routines, todayKey } = useApp();
@@ -13,7 +15,9 @@ export default function ProgressPage() {
     { icon: Sprout, value: progress.completedActivities, label: "Activities completed", bg: "bg-[#B9D5B9]", color: "text-[#385D40]" },
     { icon: MessageCircle, value: progress.communicationUses, label: "Messages selected", bg: "bg-[#F5DCE3]", color: "text-[#754D5B]" },
     { icon: Target, value: `${accuracy}%`, label: "Practice accuracy", bg: "bg-[#EBCB79]", color: "text-[#73531E]" },
-    { icon: CalendarCheck, value: `${today.length}/${routineItems.length}`, label: "Today's routine steps", bg: "bg-[#D99B7F]", color: "text-[#713F2E]" },
+    { icon: Gamepad2, value: progress.gamesCompleted, label: "Games completed", bg: "bg-[#E5EFF7]", color: "text-[#58758C]" },
+    { icon: Star, value: progress.totalPoints, label: "Total points", bg: "bg-[#FFF3E0]", color: "text-[#73531E]" },
+    { icon: CalendarCheck, value: `${today.length}/${routineItems.length}`, label: "Today's routine", bg: "bg-[#D99B7F]", color: "text-[#713F2E]" },
   ];
 
   const handleExport = () => {
@@ -23,6 +27,10 @@ export default function ProgressPage() {
       correctAnswers: progress.correctAnswers,
       totalAnswers: progress.totalAnswers,
       communicationUses: progress.communicationUses,
+      gamesCompleted: progress.gamesCompleted,
+      totalPoints: progress.totalPoints,
+      streak: progress.streak,
+      badges: progress.badges,
       routineToday: today.map((i) => routineItems[i]),
       recentActivity: progress.activityHistory,
     };
@@ -36,7 +44,7 @@ export default function ProgressPage() {
   };
 
   return (
-    <div className="w-full flex-1 px-5 py-8 max-w-[800px] mx-auto">
+    <div className="w-full flex-1 px-5 py-8 max-w-[900px] mx-auto">
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFF3E0] rounded-full text-[#73531E] font-bold text-sm mb-3">
           <BarChart3 size={18} /> Progress Dashboard
@@ -45,12 +53,24 @@ export default function ProgressPage() {
           Look how far you've come! ⭐
         </h1>
         <p className="mt-3 text-[#777572] text-base">
-          This progress is stored locally on this device. Ask a parent or teacher before sharing it.
+          This progress is stored on this device. Ask a parent or teacher before sharing it.
         </p>
       </div>
 
+      {/* Streak section */}
+      <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FFF3E0] to-[#FFE9B8] border border-[#EBCB79] mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Flame size={24} className="text-[#E8740C] flame-flicker" />
+            <h2 className="text-lg font-bold text-[#73531E]">Your Streak</h2>
+          </div>
+          <StreakDisplay />
+        </div>
+        <WeeklyCalendar />
+      </div>
+
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
@@ -88,6 +108,29 @@ export default function ProgressPage() {
         </div>
       )}
 
+      {/* Badges & Milestones */}
+      <div className="mt-6 p-5 rounded-2xl bg-[#f5efed]">
+        <h3 className="font-bold text-[#514b4b] flex items-center gap-2 mb-4">
+          <Trophy size={20} className="text-[#EBCB79]" /> Badges & Milestones
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {milestoneBadges.map((milestone) => {
+            const earned = progress.badges.includes(milestone.label);
+            return (
+              <div
+                key={milestone.days}
+                className={`flex flex-col items-center gap-1 p-4 rounded-2xl border-2 text-center transition-all
+                  ${earned ? "border-[#EBCB79] bg-gradient-to-b from-[#FFF3E0] to-[#FFE9B8] shadow-md" : "border-[#e7dede] bg-white opacity-60"}`}
+              >
+                <span className={`text-4xl ${earned ? "badge-pop" : "grayscale"}`}>{milestone.emoji}</span>
+                <strong className={`text-sm font-bold ${earned ? "text-[#73531E]" : "text-[#aaa]"}`}>{milestone.label}</strong>
+                <span className="text-xs text-[#8a7e80]">{milestone.days} days</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Activity history */}
       <h3 className="mt-8 mb-3 text-lg font-bold text-[#514b4b]">Recent activity</h3>
       {progress.activityHistory.length > 0 ? (
@@ -105,7 +148,7 @@ export default function ProgressPage() {
         </ul>
       ) : (
         <div className="p-6 rounded-xl bg-[#f5efed] text-center text-[#817878]">
-          No activities recorded yet. Try a learning activity!
+          No activities recorded yet. Try a learning activity or a game!
         </div>
       )}
 

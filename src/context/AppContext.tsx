@@ -4,10 +4,11 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
-import type { Preferences, Progress, RoutineMap } from "@/types";
-import { routineItems } from "@/data/learningData";
+import type { Preferences, Progress, RoutineMap, StreakData, SpeechState } from "@/types";
+import { routineItems, milestoneBadges } from "@/data/learningData";
 
 const STORAGE_KEYS = {
   visitorName: "senseCalmVisitorName",
@@ -18,10 +19,18 @@ const STORAGE_KEYS = {
 
 const defaultPreferences: Preferences = {
   reducedMotion: false,
-  muted: true,
+  muted: false,
   simplified: false,
-  speechEnabled: false,
+  speechEnabled: true,
   quietMode: false,
+  silentMode: false,
+};
+
+const defaultStreak: StreakData = {
+  currentStreak: 0,
+  longestStreak: 0,
+  lastActivityDate: "",
+  activeDays: [],
 };
 
 const defaultProgress: Progress = {
@@ -31,6 +40,10 @@ const defaultProgress: Progress = {
   communicationUses: 0,
   lastActiveDate: "",
   activityHistory: [],
+  gamesCompleted: 0,
+  totalPoints: 0,
+  streak: defaultStreak,
+  badges: [],
 };
 
 interface AppContextValue {
@@ -42,11 +55,17 @@ interface AppContextValue {
   recordActivity: (label: string) => void;
   recordAnswer: (isCorrect: boolean) => void;
   recordCommunication: () => void;
+  recordGameComplete: (gameLabel: string, points?: number) => void;
+  addPoints: (points: number) => void;
   routines: RoutineMap;
   toggleRoutine: (dateKey: string, index: number) => void;
   saveRoutines: (dateKey: string, indices: number[]) => void;
   todayKey: string;
-  speak: (text: string) => void;
+  speak: (text: string, lang?: string) => void;
+  pauseSpeech: () => void;
+  resumeSpeech: () => void;
+  stopSpeech: () => void;
+  speechState: SpeechState;
   showNotice: (message: string) => void;
   notice: string | null;
 }
@@ -62,6 +81,18 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
+function migrateProgress(raw: Partial<Progress> | null): Progress {
+  if (!raw) return { ...defaultProgress };
+  return {
+    ...defaultProgress,
+    ...raw,
+    gamesCompleted: raw.gamesCompleted ?? 0,
+    totalPoints: raw.totalPoints ?? 0,
+    streak: { ...defaultStreak, ...(raw.streak ?? {}) },
+    badges: raw.badges ?? [],
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [visitorName, setVisitorNameState] = useState<string>(
     () => localStorage.getItem(STORAGE_KEYS.visitorName) || ""
@@ -70,16 +101,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ...defaultPreferences,
     ...readJSON(STORAGE_KEYS.preferences, {}),
   }));
-  const [progress, setProgress] = useState<Progress>(() => ({
-    ...defaultProgress,
-    ...readJSON(STORAGE_KEYS.progress, {}),
-  }));
+  const [progress, setProgress] = useState<Progress>(() =>
+    migrateProgress(readJSON<Progress | null>(STORAGE_KEYS.progress, null))
+  );
   const [routines, setRoutines] = useState<RoutineMap>(() =>
     readJSON(STORAGE_KEYS.routines, {})
   );
   const [notice, setNotice] = useState<string | null>(null);
+  const [speechState, setSpeechState] = useState<SpeechState>({ speaking: false, paused: false });
 
   const todayKey = new Date().toISOString().slice(0, 10);
+  const currentUtterance = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.preferences, JSON.stringify(preferences));
@@ -102,12 +134,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPreferences((prev) => ({ ...prev, ...prefs }));
   }, []);
 
+  const showNotice = useCallback((message: string) => {
+    setNotice(message);
+    window.setTimeout(() => setNotice(null), 2800);
+  }, []);
+
+  /* ===== Streak logic ===== */
+  const updateStreak = useCallback((dateKey: string) => {
+    setProgress((prev) => {
+      const streak = { ...prev.streak };
+      const activeDays = [...streak.activeDays];
+
+      // Already active today — don't increase streak
+      if (streak.lastActivityDate === dateKey) {
+        return prev;
+      }
+
+      const yesterday = new Date(dateKey);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+      if (streak.lastActivityDate === yesterdayKey) {
+        streak.currentStreak += 1;
+      } else if (streak.lastActivityDate === "") {
+        streak.currentStreak = 1;
+      } else {
+        streak.currentStreak = 1;
+      }
+
+      streak.longestStreak = Math.max(streak.longestStreak, streak.currentStreak);
+      streak.lastActivityDate = dateKey;
+
+      if (!activeDays.includes(dateKey)) {
+        activeDays.push(dateKey);
+      }
+      // Keep last 60 days
+      streak.activeDays = activeDays.slice(-60);
+
+      // Check for new badges
+      const existingBadges = [...prev.badges];
+      for (const milestone of milestoneBadges) {
+        if (streak.currentStreak >= milestone.days && !existingBadges.includes(milestone.label)) {
+          existingBadges.push(milestone.label);
+        }
+      }
+
+      return { ...prev, streak, badges: existingBadges };
+    });
+  }, []);
+
   const recordActivity = useCallback((label: string) => {
     setProgress((prev) => {
-      const history = [
-        { label, date: new Date().toLocaleString() },
-        ...prev.activityHistory,
-      ].slice(0, 30);
+      const history = [{ label, date: new Date().toLocaleString() }, ...prev.activityHistory].slice(0, 30);
       return {
         ...prev,
         completedActivities: prev.completedActivities + 1,
@@ -115,7 +193,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         activityHistory: history,
       };
     });
-  }, [todayKey]);
+    updateStreak(todayKey);
+  }, [todayKey, updateStreak]);
 
   const recordAnswer = useCallback((isCorrect: boolean) => {
     setProgress((prev) => ({
@@ -132,12 +211,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const recordGameComplete = useCallback((gameLabel: string, points = 10) => {
+    setProgress((prev) => {
+      const history = [{ label: gameLabel, date: new Date().toLocaleString() }, ...prev.activityHistory].slice(0, 30);
+      return {
+        ...prev,
+        gamesCompleted: prev.gamesCompleted + 1,
+        totalPoints: prev.totalPoints + points,
+        completedActivities: prev.completedActivities + 1,
+        lastActiveDate: todayKey,
+        activityHistory: history,
+      };
+    });
+    updateStreak(todayKey);
+  }, [todayKey, updateStreak]);
+
+  const addPoints = useCallback((points: number) => {
+    setProgress((prev) => ({
+      ...prev,
+      totalPoints: prev.totalPoints + points,
+    }));
+  }, []);
+
   const toggleRoutine = useCallback((dateKey: string, index: number) => {
     setRoutines((prev) => {
       const current = prev[dateKey] || [];
-      const next = current.includes(index)
-        ? current.filter((i) => i !== index)
-        : [...current, index];
+      const next = current.includes(index) ? current.filter((i) => i !== index) : [...current, index];
       return { ...prev, [dateKey]: next };
     });
   }, []);
@@ -146,26 +245,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRoutines((prev) => ({ ...prev, [dateKey]: indices }));
   }, []);
 
-  const showNotice = useCallback((message: string) => {
-    setNotice(message);
-    window.setTimeout(() => setNotice(null), 2800);
-  }, []);
-
+  /* ===== Improved TTS with play/pause/resume/stop ===== */
   const speak = useCallback(
-    (text: string) => {
-      if (!preferences.speechEnabled || preferences.muted) return;
+    (text: string, lang?: string) => {
+      // Silent Mode mutes all audio but keeps visuals
+      // muted also blocks speech; speechEnabled must be on
+      if (preferences.silentMode || preferences.muted || !preferences.speechEnabled) return;
       if (!("speechSynthesis" in window)) {
         showNotice("Speech is not available in this browser.");
         return;
       }
       window.speechSynthesis.cancel();
+
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.85;
-      utterance.pitch = 1;
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+      utterance.volume = 1;
+
+      if (lang) {
+        utterance.lang = lang;
+      }
+
+      // Try to pick a natural-sounding voice
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        const langPrefix = (lang || "en").split("-")[0];
+        const preferred = voices.find((v) => v.lang.startsWith(langPrefix) && v.name.toLowerCase().includes("google"));
+        const natural = preferred || voices.find((v) => v.lang.startsWith(langPrefix) && v.localService);
+        const fallback = preferred || natural || voices.find((v) => v.lang.startsWith(langPrefix)) || voices[0];
+        if (fallback) utterance.voice = fallback;
+      }
+
+      utterance.onstart = () => setSpeechState({ speaking: true, paused: false });
+      utterance.onend = () => setSpeechState({ speaking: false, paused: false });
+      utterance.onerror = () => setSpeechState({ speaking: false, paused: false });
+
+      currentUtterance.current = utterance;
       window.speechSynthesis.speak(utterance);
     },
-    [preferences.speechEnabled, preferences.muted, showNotice]
+    [preferences.silentMode, preferences.muted, preferences.speechEnabled, showNotice]
   );
+
+  const pauseSpeech = useCallback(() => {
+    if ("speechSynthesis" in window && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      setSpeechState({ speaking: true, paused: true });
+    }
+  }, []);
+
+  const resumeSpeech = useCallback(() => {
+    if ("speechSynthesis" in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      setSpeechState({ speaking: true, paused: false });
+    }
+  }, []);
+
+  const stopSpeech = useCallback(() => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeechState({ speaking: false, paused: false });
+  }, []);
+
+  // Load voices if they load asynchronously
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const handler = () => window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", handler);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", handler);
+  }, []);
+
+  // Stop speech when silent mode turns on
+  useEffect(() => {
+    if (preferences.silentMode && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setSpeechState({ speaking: false, paused: false });
+    }
+  }, [preferences.silentMode]);
 
   return (
     <AppContext.Provider
@@ -178,11 +334,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         recordActivity,
         recordAnswer,
         recordCommunication,
+        recordGameComplete,
+        addPoints,
         routines,
         toggleRoutine,
         saveRoutines,
         todayKey,
         speak,
+        pauseSpeech,
+        resumeSpeech,
+        stopSpeech,
+        speechState,
         showNotice,
         notice,
       }}
