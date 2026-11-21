@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useApp } from "@/context/AppContext";
 import type { ModuleName } from "@/types";
+import AccountMenu from "@/components/AccountMenu";
 import {
   Heart,
   Cloud,
@@ -82,7 +83,7 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
   };
 
   return (
-    <header className="w-full min-h-[76px] px-3 sm:px-[5%] py-2.5 flex items-center justify-between gap-2.5 bg-[#FFF8F5] shadow-sm relative z-30 flex-wrap">
+    <header className="w-full min-h-[76px] px-3 sm:px-[4%] py-2.5 flex items-center justify-between gap-2.5 bg-[#FFF8F5] shadow-xs relative z-30 flex-wrap">
       {/* Brand logo & Home */}
       <div className="flex items-center gap-3">
         <button
@@ -100,7 +101,7 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
               ? "bg-[#EAF5ED] text-[#3D7146] border-[#D0E7D4]"
               : "bg-[#FFF4E5] text-[#9A6214] border-[#FEE1BD]"
           }`}
-          title={isOnline ? "Connected & Offline Ready" : "Working Offline Mode"}
+          title={isOnline ? "Connected & Cloud Database Ready" : "Working Offline Mode"}
         >
           {isOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
           <span className="hidden md:inline">{isOnline ? "Ready" : "Offline"}</span>
@@ -113,10 +114,10 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
           <button
             key={key}
             onClick={() => onNavigate(key)}
-            className={`px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer
+            className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer
               ${
                 current === key
-                  ? "bg-[#EBCBD5] text-[#754D5B] shadow-sm scale-[1.02]"
+                  ? "bg-[#EBCBD5] text-[#754D5B] shadow-xs scale-[1.02]"
                   : "text-[#77736F] hover:bg-[#F5DCE3] hover:text-[#8F596B]"
               }`}
           >
@@ -128,10 +129,10 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
         {/* Caregiver Portal Link */}
         <button
           onClick={handleCaregiverClick}
-          className={`px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer
+          className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 cursor-pointer
             ${
               current === "caregiver"
-                ? "bg-[#D8E6DB] text-[#3F6146] shadow-sm scale-[1.02]"
+                ? "bg-[#D8E6DB] text-[#3F6146] shadow-xs scale-[1.02]"
                 : "text-[#6C806D] hover:bg-[#EAF3EC]"
             }`}
           title="Caregiver & Teacher Portal"
@@ -141,7 +142,7 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
         </button>
       </nav>
 
-      {/* Quick Action Controls */}
+      {/* Quick Action Controls & Account Menu */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Quick Break Button */}
         <button
@@ -156,7 +157,7 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
         {/* Persistent Emergency Button */}
         <button
           onClick={() => setEmergencyModalOpen(true)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FEEFEB] border-2 border-[#FCA5A5] text-[#C53030] text-xs font-extrabold transition-all hover:bg-[#FEE2E2] hover:scale-[1.03] cursor-pointer shadow-sm animate-pulse"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FEEFEB] border-2 border-[#FCA5A5] text-[#C53030] text-xs font-extrabold transition-all hover:bg-[#FEE2E2] hover:scale-[1.03] cursor-pointer shadow-xs animate-pulse"
           title="Urgent Help & Emergency Communication"
           aria-label="Need Help or Emergency Communication"
         >
@@ -164,7 +165,7 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
           <span>Need Help</span>
         </button>
 
-        {/* Language quick switch: English / Telugu */}
+        {/* Language switch: English / Telugu */}
         <button
           onClick={toggleLanguage}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-bold transition-all cursor-pointer
@@ -182,10 +183,10 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
           <span>{preferences.ttsLanguage === "te" ? "తెలుగు" : "EN"}</span>
         </button>
 
-        {/* Prominent Silent Mode Toggle */}
+        {/* Silent Mode Toggle */}
         <button
           onClick={toggleSilentMode}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap transition-all shadow-sm cursor-pointer
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap transition-all shadow-xs cursor-pointer
             ${
               isSilent
                 ? "bg-[#FDF0ED] border-[#F2C6BB] text-[#B85741] hover:bg-[#FAE5E0]"
@@ -202,21 +203,8 @@ export default function NavBar({ current, onNavigate }: NavBarProps) {
           <span>{isSilent ? "Silent" : "Sound"}</span>
         </button>
 
-        {/* Quiet Mode toggle */}
-        <button
-          onClick={() => updatePreferences({ quietMode: !preferences.quietMode })}
-          className={`hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-bold whitespace-nowrap transition-all cursor-pointer
-            ${
-              preferences.quietMode
-                ? "bg-[#DCE9DC] border-[#D7E3D5] text-[#5E7863]"
-                : "bg-[#EDF3E9] border-[#D7E3D5] text-[#5E7863] hover:bg-[#DCE9DC]"
-            }`}
-          aria-pressed={preferences.quietMode}
-          title="Gentle visuals without bouncy animations"
-        >
-          <Cloud size={13} />
-          <span>Calm: {preferences.quietMode ? "On" : "Off"}</span>
-        </button>
+        {/* Caregiver Account & Child Profile Dropdown */}
+        <AccountMenu onNavigate={onNavigate} />
       </div>
     </header>
   );

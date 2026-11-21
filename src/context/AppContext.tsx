@@ -1,8 +1,8 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
+  useEffect,
   useCallback,
   useRef,
   type ReactNode,
@@ -11,42 +11,61 @@ import type {
   Preferences,
   Progress,
   RoutineMap,
+  ModuleName,
+  TTSStatus,
   TTSLanguage,
   AACCardItem,
   EmotionCheckInRecord,
   TimelineStepItem,
   ChildProfile,
+  CaregiverProfile,
   EmergencyCard,
-  GameDifficulty,
+  SyncStatus,
 } from "@/types";
-import { routineItems } from "@/data/learningData";
-import { achievementBadges } from "@/data/badgesData";
-import { initialTimelineSteps } from "@/data/routineTimelineData";
 import {
-  findBestVoice,
   soundEffects,
   ambientSoundManager,
   getAvailableVoices,
   isTeluguVoiceAvailable,
 } from "@/utils/audioManager";
 import {
-  storeImageInDB,
-  deleteImageFromDB,
+  saveCustomImage,
+  getCustomImage,
   getAllCustomImages,
+  deleteCustomImage,
 } from "@/utils/indexedDBStorage";
+import { initialTimelineSteps } from "@/data/routineTimelineData";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
+import {
+  getOrCreateCaregiverProfile,
+  fetchChildProfilesFromDB,
+  createChildProfileInDB,
+  updateChildProfileInDB,
+  fetchAACCardsFromDB,
+  saveAACCardToDB,
+  deleteAACCardFromDB,
+  logEmotionCheckInToDB,
+  fetchSensoryPreferencesFromDB,
+  saveSensoryPreferencesToDB,
+  saveLearningProgressToDB,
+  fetchRoutineStepsFromDB,
+  flushSyncQueue,
+} from "@/lib/syncService";
 
 const STORAGE_KEYS = {
-  visitorName: "senseCalmVisitorName",
-  progress: "senseCalmProgress",
-  preferences: "senseCalmPreferences",
-  routines: "senseCalmRoutines",
-  customCards: "senseCalmCustomCards",
-  emotionHistory: "senseCalmEmotionHistory",
-  timelineRoutines: "senseCalmTimelineRoutines",
-  childProfile: "senseCalmChildProfile",
+  preferences: "sense_calm_preferences_v2",
+  progress: "sense_calm_progress_v2",
+  routines: "sense_calm_routines_v2",
+  visitorName: "sense_calm_visitor_name_v2",
+  customCards: "sense_calm_custom_cards_v2",
+  emotionHistory: "sense_calm_emotion_history_v2",
+  timelineRoutines: "sense_calm_timeline_routines_v2",
+  childProfile: "sense_calm_child_profile_v2",
+  childProfilesList: "sense_calm_child_profiles_list_v2",
+  caregiverProfile: "sense_calm_caregiver_profile_v2",
 };
 
-export const defaultPreferences: Preferences = {
+const defaultPreferences: Preferences = {
   reducedMotion: false,
   muted: false,
   silentMode: false,
@@ -61,11 +80,11 @@ export const defaultPreferences: Preferences = {
   brightnessOverlay: "normal",
   highContrast: false,
   ambientSound: "none",
-  ambientVolume: 0.35,
+  ambientVolume: 0.4,
   gameDifficulty: "beginner",
 };
 
-export const defaultProgress: Progress = {
+const defaultProgress: Progress = {
   completedActivities: 0,
   correctAnswers: 0,
   totalAnswers: 0,
@@ -80,18 +99,28 @@ export const defaultProgress: Progress = {
   unlockedBadges: [],
 };
 
-export const defaultChildProfile: ChildProfile = {
+const defaultChildProfile: ChildProfile = {
   name: "",
   preferredLanguage: "en",
   preferredVoiceURI: "",
-  favoriteCardIds: ["need_help", "need_water", "feel_happy", "need_break"],
-  favoriteActivities: ["Picture Detective", "Emotion Explorer"],
-  frequentlyUsedSentences: ["I want water", "I need a break", "I feel happy"],
+  preferredCommMode: "aac",
+  sensorySensitivities: ["Loud sudden noises"],
+  favoriteCalmingTools: ["Guided 4-4-4 breathing", "Gentle rain & ocean waves"],
+  avatarEmoji: "🐰",
+  favoriteCardIds: [],
+  favoriteActivities: [],
+  frequentlyUsedSentences: [],
   caregiverPIN: "",
-  notes: "A calm, gentle learning and communication space.",
+  notes: "",
 };
 
-export type TTSStatus = "idle" | "speaking" | "paused";
+const routineItems = [
+  "Brush Teeth",
+  "Eat Breakfast",
+  "School Activities",
+  "Quiet Play",
+  "Bedtime Stories",
+];
 
 interface AppContextValue {
   visitorName: string;
@@ -120,36 +149,36 @@ interface AppContextValue {
   showNotice: (message: string) => void;
   notice: string | null;
 
-  // Part 1: Emotion Assistant
+  // Emotion Assistant
   emotionHistory: EmotionCheckInRecord[];
   recordEmotionCheckIn: (
     checkIn: Omit<EmotionCheckInRecord, "id" | "timestamp" | "dateKey">
   ) => void;
 
-  // Part 3 & 4: Custom AAC Cards & Familiar People
+  // Custom AAC Cards & Familiar People
   customAACCards: AACCardItem[];
   addCustomAACCard: (card: AACCardItem, imageBlobOrDataUrl?: string) => Promise<void>;
   updateCustomAACCard: (card: AACCardItem, imageBlobOrDataUrl?: string) => Promise<void>;
   deleteCustomAACCard: (cardId: string) => Promise<void>;
   recordCardUsage: (cardId: string) => void;
 
-  // Part 5: Emergency Communication
+  // Emergency Communication
   emergencyModalOpen: boolean;
   setEmergencyModalOpen: (open: boolean) => void;
   triggerEmergency: (card: EmergencyCard) => void;
 
-  // Part 2 & Comfort
+  // Comfort & Breathing
   breathingModalOpen: boolean;
   setBreathingModalOpen: (open: boolean) => void;
 
-  // Part 6: Visual Routine Timeline
+  // Visual Routine Timeline
   timelineSteps: TimelineStepItem[];
   toggleTimelineStep: (id: string) => void;
   addTimelineStep: (step: TimelineStepItem) => void;
   deleteTimelineStep: (id: string) => void;
   reorderTimelineSteps: (steps: TimelineStepItem[]) => void;
 
-  // Part 3: Caregiver Profile & Gate
+  // Caregiver Gate & Authentication
   childProfile: ChildProfile;
   updateChildProfile: (profile: Partial<ChildProfile>) => void;
   isCaregiverAuthenticated: boolean;
@@ -157,10 +186,30 @@ interface AppContextValue {
   caregiverGateModalOpen: boolean;
   setCaregiverGateModalOpen: (open: boolean) => void;
 
-  // Part 7: Connectivity
+  // Supabase Authentication & Database Integration
+  isAuthenticated: boolean;
+  authLoading: boolean;
+  caregiverProfile: CaregiverProfile | null;
+  childProfiles: ChildProfile[];
+  activeChildProfile: ChildProfile | null;
+  isSupabaseActive: boolean;
+  syncStatus: SyncStatus;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
+  register: (
+    fullName: string,
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string; requireVerification?: boolean }>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  createChildProfile: (profile: Omit<ChildProfile, "id">) => Promise<ChildProfile | null>;
+  selectActiveChild: (child: ChildProfile) => void;
+  syncNow: () => Promise<void>;
+
+  // Connectivity
   isOnline: boolean;
 
-  // Part 10: Privacy & Export
+  // Privacy & Export
   exportAllData: () => void;
   clearAllUserData: () => void;
 }
@@ -233,7 +282,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     readJSON(STORAGE_KEYS.routines, {})
   );
 
-  // New Upgrade States
   const [customAACCards, setCustomAACCards] = useState<AACCardItem[]>(() =>
     readJSON(STORAGE_KEYS.customCards, [])
   );
@@ -255,6 +303,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   });
 
+  // Supabase Auth & Profile States
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [caregiverProfile, setCaregiverProfile] = useState<CaregiverProfile | null>(() =>
+    readJSON(STORAGE_KEYS.caregiverProfile, null)
+  );
+  const [childProfiles, setChildProfiles] = useState<ChildProfile[]>(() =>
+    readJSON(STORAGE_KEYS.childProfilesList, [])
+  );
+  const [activeChildProfile, setActiveChildProfile] = useState<ChildProfile | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+
   const [notice, setNotice] = useState<string | null>(null);
   const [ttsStatus, setTtsStatus] = useState<TTSStatus>("idle");
   const [currentUtteranceText, setCurrentUtteranceText] = useState<string>("");
@@ -273,10 +333,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const todayKey = getLocalDateKey();
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Track Online / Offline status
+  // Track Online / Offline status and flush pending sync items
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      setSyncStatus("syncing");
+      flushSyncQueue().then(() => setSyncStatus("synced")).catch(() => setSyncStatus("error"));
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncStatus("offline");
+    };
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     return () => {
@@ -349,7 +417,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [routines]);
 
   useEffect(() => {
-    // Save custom cards metadata without raw heavy base64 to avoid quota issues
     const lightweight = customAACCards.map(({ imageUrl, ...rest }) => ({
       ...rest,
       imageUrl: imageUrl && !imageUrl.startsWith("blob:") ? imageUrl : undefined,
@@ -368,6 +435,283 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.childProfile, JSON.stringify(childProfile));
   }, [childProfile]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.childProfilesList, JSON.stringify(childProfiles));
+  }, [childProfiles]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.caregiverProfile, JSON.stringify(caregiverProfile));
+  }, [caregiverProfile]);
+
+  // -------------------------------------------------------------
+  // SUPABASE SESSION RESTORATION & AUTH STATE LISTENER
+  // -------------------------------------------------------------
+  const loadCaregiverAndChildren = useCallback(
+    async (userId: string, email: string, name?: string) => {
+      try {
+        setSyncStatus("syncing");
+        const profile = await getOrCreateCaregiverProfile(userId, email, name);
+        if (profile) {
+          setCaregiverProfile(profile);
+          setIsCaregiverAuthenticated(true);
+        }
+
+        const children = await fetchChildProfilesFromDB(userId);
+        if (children && children.length > 0) {
+          setChildProfiles(children);
+          const first = children[0];
+          setActiveChildProfile(first);
+          setChildProfile(first);
+
+          // Fetch cloud AAC cards and merge with local
+          const dbCards = await fetchAACCardsFromDB(first.id!, userId);
+          if (dbCards && dbCards.length > 0) {
+            setCustomAACCards((prev) => {
+              const map = new Map<string, AACCardItem>();
+              prev.forEach((c) => map.set(c.id, c));
+              dbCards.forEach((c) => map.set(c.id, c));
+              return Array.from(map.values());
+            });
+          }
+
+          // Fetch sensory preferences
+          const dbSensory = await fetchSensoryPreferencesFromDB(first.id!, userId);
+          if (dbSensory) {
+            setPreferences((prev) => ({ ...prev, ...dbSensory }));
+          }
+
+          // Fetch routine steps
+          const dbSteps = await fetchRoutineStepsFromDB(first.id!, userId);
+          if (dbSteps && dbSteps.length > 0) {
+            setTimelineSteps(dbSteps);
+          }
+        }
+        setSyncStatus("synced");
+      } catch (err) {
+        console.warn("Error restoring caregiver data from Supabase:", err);
+        setSyncStatus("error");
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setAuthLoading(false);
+      return;
+    }
+
+    // 1. Check existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        loadCaregiverAndChildren(
+          session.user.id,
+          session.user.email || "",
+          session.user.user_metadata?.full_name
+        );
+      }
+      setAuthLoading(false);
+    });
+
+    // 2. Listen to auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        loadCaregiverAndChildren(
+          session.user.id,
+          session.user.email || "",
+          session.user.user_metadata?.full_name
+        );
+      } else if (event === "SIGNED_OUT") {
+        setIsAuthenticated(false);
+        setIsCaregiverAuthenticated(false);
+        setCaregiverProfile(null);
+        setActiveChildProfile(null);
+        setSyncStatus("idle");
+      }
+      setAuthLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [loadCaregiverAndChildren]);
+
+  // -------------------------------------------------------------
+  // AUTH METHODS
+  // -------------------------------------------------------------
+  const login = useCallback(
+    async (email: string, password: string, rememberMe = true) => {
+      if (!isSupabaseConfigured) {
+        // Local mode fallback
+        const mockCaregiver: CaregiverProfile = {
+          id: `local_cg_${Date.now()}`,
+          email,
+          fullName: email.split("@")[0] || "Caregiver",
+          role: "caregiver",
+        };
+        setCaregiverProfile(mockCaregiver);
+        setIsAuthenticated(true);
+        setIsCaregiverAuthenticated(true);
+        return { success: true };
+      }
+
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
+
+        if (data.user) {
+          setIsAuthenticated(true);
+          await loadCaregiverAndChildren(
+            data.user.id,
+            data.user.email || email,
+            data.user.user_metadata?.full_name
+          );
+          return { success: true };
+        }
+
+        return { success: false, error: "Sign in failed. Please try again." };
+      } catch (err: any) {
+        return { success: false, error: err.message || "An unexpected error occurred." };
+      }
+    },
+    [loadCaregiverAndChildren]
+  );
+
+  const register = useCallback(
+    async (fullName: string, email: string, password: string) => {
+      if (!isSupabaseConfigured) {
+        const mockCaregiver: CaregiverProfile = {
+          id: `local_cg_${Date.now()}`,
+          email,
+          fullName,
+          role: "caregiver",
+        };
+        setCaregiverProfile(mockCaregiver);
+        setIsAuthenticated(true);
+        setIsCaregiverAuthenticated(true);
+        return { success: true };
+      }
+
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { full_name: fullName },
+          },
+        });
+
+        if (error) {
+          return { success: false, error: error.message };
+        }
+
+        if (data.user) {
+          // Check if email confirmation is required
+          const requireVerification = !data.session;
+          if (data.session) {
+            setIsAuthenticated(true);
+            await loadCaregiverAndChildren(data.user.id, email, fullName);
+          }
+          return { success: true, requireVerification };
+        }
+
+        return { success: false, error: "Could not create account." };
+      } catch (err: any) {
+        return { success: false, error: err.message || "Registration error." };
+      }
+    },
+    [loadCaregiverAndChildren]
+  );
+
+  const logout = useCallback(async () => {
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
+    setIsAuthenticated(false);
+    setIsCaregiverAuthenticated(false);
+    setCaregiverProfile(null);
+    setActiveChildProfile(null);
+    setSyncStatus("idle");
+    setNotice("You have safely signed out.");
+  }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
+    if (!isSupabaseConfigured) {
+      return { success: true };
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/`,
+      });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }, []);
+
+  const createChildProfile = useCallback(
+    async (profile: Omit<ChildProfile, "id">) => {
+      const caregiverId = caregiverProfile?.id || "local_caregiver";
+      const created = await createChildProfileInDB(profile, caregiverId);
+      if (created) {
+        setChildProfiles((prev) => [...prev, created]);
+        setActiveChildProfile(created);
+        setChildProfile(created);
+        setVisitorNameState(created.name);
+        return created;
+      }
+      return null;
+    },
+    [caregiverProfile]
+  );
+
+  const selectActiveChild = useCallback(
+    async (child: ChildProfile) => {
+      setActiveChildProfile(child);
+      setChildProfile(child);
+      setVisitorNameState(child.name);
+
+      if (caregiverProfile?.id && child.id) {
+        // Load custom cards for selected child
+        const cards = await fetchAACCardsFromDB(child.id, caregiverProfile.id);
+        if (cards && cards.length > 0) {
+          setCustomAACCards(cards);
+        }
+      }
+      setNotice(`Active child profile set to ${child.name} ♡`);
+    },
+    [caregiverProfile]
+  );
+
+  const syncNow = useCallback(async () => {
+    if (!isOnline) {
+      setSyncStatus("offline");
+      return;
+    }
+    setSyncStatus("syncing");
+    try {
+      await flushSyncQueue();
+      if (caregiverProfile?.id && activeChildProfile?.id) {
+        await saveSensoryPreferencesToDB(preferences, activeChildProfile.id, caregiverProfile.id);
+      }
+      setSyncStatus("synced");
+      setNotice("Cloud Database synchronized. ☁");
+    } catch {
+      setSyncStatus("error");
+    }
+  }, [isOnline, caregiverProfile, activeChildProfile, preferences]);
 
   const setVisitorName = useCallback((name: string) => {
     localStorage.setItem(STORAGE_KEYS.visitorName, name);
@@ -419,10 +763,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           stopSpeech();
           ambientSoundManager.stop();
         }
+
+        // Sync to Supabase if authenticated
+        if (caregiverProfile?.id && activeChildProfile?.id) {
+          saveSensoryPreferencesToDB(next, activeChildProfile.id, caregiverProfile.id);
+        }
+
         return next;
       });
     },
-    [stopSpeech]
+    [stopSpeech, caregiverProfile, activeChildProfile]
   );
 
   const toggleSilentMode = useCallback(() => {
@@ -435,22 +785,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         showNotice("Silent Mode is OFF 🔊 Audio and speech enabled.");
       }
-      return {
+      const updated = {
         ...prev,
         silentMode: willBeSilent,
         muted: willBeSilent,
       };
+
+      if (caregiverProfile?.id && activeChildProfile?.id) {
+        saveSensoryPreferencesToDB(updated, activeChildProfile.id, caregiverProfile.id);
+      }
+
+      return updated;
     });
-  }, [stopSpeech, showNotice]);
+  }, [stopSpeech, showNotice, caregiverProfile, activeChildProfile]);
 
   const playSound = useCallback(
     (type: "pop" | "chime" | "swoosh" | "celebration" | "breathing") => {
       if (preferences.silentMode || preferences.muted) return;
       if (type === "pop") soundEffects.playPop(false);
       else if (type === "chime") soundEffects.playChime(false);
-      else if (type === "breathing") soundEffects.playBreathingChime(false);
       else if (type === "swoosh") soundEffects.playSwoosh(false);
       else if (type === "celebration") soundEffects.playCelebration(false);
+      else if (type === "breathing") soundEffects.playBreathingChime(false);
     },
     [preferences.silentMode, preferences.muted]
   );
@@ -460,34 +816,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (preferences.silentMode || preferences.muted || !preferences.speechEnabled) {
         return;
       }
-
       if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        showNotice("Text-to-speech is not available in this browser.");
         return;
       }
 
-      const cleanText = text.trim();
-      if (!cleanText) return;
-
       window.speechSynthesis.cancel();
 
-      const lang = langOverride || preferences.ttsLanguage;
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-
-      const chosenVoice = findBestVoice(lang, preferences.ttsVoiceURI);
-      if (chosenVoice) {
-        utterance.voice = chosenVoice;
-        utterance.lang = chosenVoice.lang;
-      } else {
-        utterance.lang = lang === "te" ? "te-IN" : "en-US";
-      }
+      const lang = langOverride || preferences.ttsLanguage || "en";
+      const utterance = new SpeechSynthesisUtterance(text);
+      activeUtteranceRef.current = utterance;
 
       utterance.rate = preferences.ttsRate || 0.88;
       utterance.pitch = preferences.ttsPitch || 1.0;
 
+      if (preferences.ttsVoiceURI && voices.length > 0) {
+        const found = voices.find((v) => v.voiceURI === preferences.ttsVoiceURI);
+        if (found) utterance.voice = found;
+      }
+
+      utterance.lang = lang === "te" ? "te-IN" : "en-US";
+
       utterance.onstart = () => {
-        setTtsStatus("speaking");
-        setCurrentUtteranceText(cleanText);
+        setTtsStatus("playing");
+        setCurrentUtteranceText(text);
       };
 
       utterance.onend = () => {
@@ -497,285 +848,240 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
 
       utterance.onerror = (e) => {
-        if (e.error !== "interrupted" && e.error !== "canceled") {
-          console.warn("Speech synthesis notice:", e.error);
-        }
+        console.warn("Speech synthesis notice:", e);
         setTtsStatus("idle");
         setCurrentUtteranceText("");
         activeUtteranceRef.current = null;
       };
 
-      utterance.onpause = () => setTtsStatus("paused");
-      utterance.onresume = () => setTtsStatus("speaking");
-
-      activeUtteranceRef.current = utterance;
       window.speechSynthesis.speak(utterance);
     },
-    [
-      preferences.silentMode,
-      preferences.muted,
-      preferences.speechEnabled,
-      preferences.ttsLanguage,
-      preferences.ttsVoiceURI,
-      preferences.ttsRate,
-      preferences.ttsPitch,
-      showNotice,
-    ]
-  );
-
-  const checkBadgeUnlocks = useCallback(
-    (newProgress: Progress) => {
-      const newlyEarned: string[] = [];
-      const currentUnlocked = new Set(newProgress.unlockedBadges);
-
-      achievementBadges.forEach((badge) => {
-        if (currentUnlocked.has(badge.id)) return;
-
-        let shouldUnlock = false;
-        if (badge.id === "streak_3" && newProgress.currentStreak >= 3) shouldUnlock = true;
-        if (badge.id === "streak_7" && newProgress.currentStreak >= 7) shouldUnlock = true;
-        if (badge.id === "streak_14" && newProgress.currentStreak >= 14) shouldUnlock = true;
-        if (badge.id === "streak_30" && newProgress.currentStreak >= 30) shouldUnlock = true;
-        if (badge.id === "first_sentence" && newProgress.communicationUses >= 1) shouldUnlock = true;
-        if (badge.id === "games_3" && newProgress.totalGamesCompleted >= 3) shouldUnlock = true;
-        if (badge.id === "points_100" && newProgress.totalPoints >= 100) shouldUnlock = true;
-
-        if (shouldUnlock) {
-          newlyEarned.push(badge.id);
-          showNotice(`🌟 Achievement Unlocked: ${badge.title}! 🎉`);
-          playSound("celebration");
-        }
-      });
-
-      if (newlyEarned.length > 0) {
-        return [...newProgress.unlockedBadges, ...newlyEarned];
-      }
-      return newProgress.unlockedBadges;
-    },
-    [showNotice, playSound]
-  );
-
-  const recordActivity = useCallback(
-    (label: string, points = 10) => {
-      setProgress((prev) => {
-        const today = getLocalDateKey();
-        const yesterday = getYesterdayDateKey();
-
-        let newStreak = prev.currentStreak;
-
-        if (prev.lastActiveDate === today) {
-          newStreak = prev.currentStreak || 1;
-        } else if (prev.lastActiveDate === yesterday) {
-          newStreak = (prev.currentStreak || 0) + 1;
-        } else {
-          newStreak = 1;
-        }
-
-        const newLongest = Math.max(prev.longestStreak || 0, newStreak);
-        const newPoints = (prev.totalPoints || 0) + points;
-
-        const updatedDates = prev.activeDates.includes(today)
-          ? prev.activeDates
-          : [...prev.activeDates, today];
-
-        const history = [
-          {
-            label,
-            date:
-              new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
-              ", " +
-              new Date().toLocaleDateString(),
-          },
-          ...prev.activityHistory,
-        ].slice(0, 40);
-
-        const updatedProgress: Progress = {
-          ...prev,
-          completedActivities: prev.completedActivities + 1,
-          lastActiveDate: today,
-          currentStreak: newStreak,
-          longestStreak: newLongest,
-          totalPoints: newPoints,
-          activeDates: updatedDates,
-          activityHistory: history,
-        };
-
-        updatedProgress.unlockedBadges = checkBadgeUnlocks(updatedProgress);
-        return updatedProgress;
-      });
-    },
-    [checkBadgeUnlocks]
+    [preferences, voices]
   );
 
   const recordAnswer = useCallback((isCorrect: boolean) => {
     setProgress((prev) => ({
       ...prev,
       totalAnswers: prev.totalAnswers + 1,
-      correctAnswers: isCorrect ? prev.correctAnswers + 1 : prev.correctAnswers,
+      correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
     }));
+  }, []);
+
+  const recordActivity = useCallback((label: string, points = 10) => {
+    const today = getLocalDateKey();
+    const yesterday = getYesterdayDateKey();
+
+    setProgress((prev) => {
+      let nextStreak = prev.currentStreak;
+      const alreadyActiveToday = prev.activeDates.includes(today);
+
+      if (!alreadyActiveToday) {
+        if (prev.lastActiveDate === yesterday || prev.currentStreak === 0) {
+          nextStreak += 1;
+        } else {
+          nextStreak = 1;
+        }
+      }
+
+      const longest = Math.max(prev.longestStreak, nextStreak);
+      const newActiveDates = alreadyActiveToday ? prev.activeDates : [...prev.activeDates, today];
+
+      const newHistory = [
+        { label, date: new Date().toISOString() },
+        ...prev.activityHistory.slice(0, 49),
+      ];
+
+      return {
+        ...prev,
+        completedActivities: prev.completedActivities + 1,
+        totalPoints: prev.totalPoints + points,
+        currentStreak: nextStreak,
+        longestStreak: longest,
+        lastActiveDate: today,
+        activeDates: newActiveDates,
+        activityHistory: newHistory,
+      };
+    });
   }, []);
 
   const recordGameCompleted = useCallback(
     (gameName: string, earnedPoints = 15) => {
-      setProgress((prev) => {
-        const updatedGames = (prev.totalGamesCompleted || 0) + 1;
-        const progressWithGames = {
-          ...prev,
-          totalGamesCompleted: updatedGames,
-        };
-        progressWithGames.unlockedBadges = checkBadgeUnlocks(progressWithGames);
-        return progressWithGames;
-      });
-      recordActivity(`Game: ${gameName}`, earnedPoints);
-    },
-    [checkBadgeUnlocks, recordActivity]
-  );
+      setProgress((prev) => ({
+        ...prev,
+        totalGamesCompleted: prev.totalGamesCompleted + 1,
+      }));
+      recordActivity(`Played ${gameName}`, earnedPoints);
 
-  const recordCommunication = useCallback(
-    (sentenceText?: string) => {
-      setProgress((prev) => {
-        const nextUses = prev.communicationUses + 1;
-        const updated = {
-          ...prev,
-          communicationUses: nextUses,
-        };
-        updated.unlockedBadges = checkBadgeUnlocks(updated);
-        return updated;
-      });
-      recordActivity(
-        sentenceText ? `Spoke AAC: "${sentenceText.slice(0, 30)}..."` : "AAC message",
-        10
-      );
-
-      // Track frequently used sentences in child profile
-      if (sentenceText && sentenceText.trim()) {
-        setChildProfile((prev) => {
-          const list = [sentenceText.trim(), ...prev.frequentlyUsedSentences.filter((s) => s !== sentenceText.trim())].slice(0, 8);
-          return { ...prev, frequentlyUsedSentences: list };
-        });
+      // Save to Supabase if authenticated
+      if (caregiverProfile?.id && activeChildProfile?.id) {
+        saveLearningProgressToDB(
+          gameName,
+          earnedPoints,
+          progress.correctAnswers + 1,
+          progress.totalAnswers + 1,
+          preferences.gameDifficulty,
+          progress.currentStreak,
+          activeChildProfile.id,
+          caregiverProfile.id
+        );
       }
     },
-    [checkBadgeUnlocks, recordActivity]
+    [recordActivity, caregiverProfile, activeChildProfile, progress, preferences.gameDifficulty]
   );
+
+  const recordCommunication = useCallback((sentenceText?: string) => {
+    setProgress((prev) => ({
+      ...prev,
+      communicationUses: prev.communicationUses + 1,
+    }));
+    if (sentenceText) {
+      setChildProfile((prev) => {
+        const sentences = [sentenceText, ...prev.frequentlyUsedSentences.filter((s) => s !== sentenceText)].slice(0, 10);
+        return { ...prev, frequentlyUsedSentences: sentences };
+      });
+    }
+  }, []);
 
   const toggleRoutine = useCallback((dateKey: string, index: number) => {
     setRoutines((prev) => {
       const current = prev[dateKey] || [];
-      const next = current.includes(index)
+      const updated = current.includes(index)
         ? current.filter((i) => i !== index)
         : [...current, index];
-      return { ...prev, [dateKey]: next };
+      return { ...prev, [dateKey]: updated };
     });
   }, []);
 
-  const saveRoutines = useCallback(
-    (dateKey: string, indices: number[]) => {
-      setRoutines((prev) => ({ ...prev, [dateKey]: indices }));
-      recordActivity("Daily routine completed", 20);
+  const saveRoutines = useCallback((dateKey: string, indices: number[]) => {
+    setRoutines((prev) => ({ ...prev, [dateKey]: indices }));
+  }, []);
 
-      if (indices.length === routineItems.length) {
-        setProgress((prev) => {
-          if (!prev.unlockedBadges.includes("routine_complete")) {
-            showNotice("🌷 Routine Star Badge Unlocked! All steps done! 🎉");
-            playSound("celebration");
-            return {
-              ...prev,
-              unlockedBadges: [...prev.unlockedBadges, "routine_complete"],
-            };
-          }
-          return prev;
-        });
-      }
-    },
-    [recordActivity, showNotice, playSound]
-  );
-
-  // ==========================================
-  // PART 1: EMOTION CHECK-IN
-  // ==========================================
+  // -------------------------------------------------------------
+  // EMOTIONS ASSISTANT
+  // -------------------------------------------------------------
   const recordEmotionCheckIn = useCallback(
     (checkIn: Omit<EmotionCheckInRecord, "id" | "timestamp" | "dateKey">) => {
-      const newRecord: EmotionCheckInRecord = {
+      const record: EmotionCheckInRecord = {
         ...checkIn,
-        id: `emot-${Date.now()}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        id: `emotion_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        timestamp: new Date().toISOString(),
         dateKey: getLocalDateKey(),
       };
-      setEmotionHistory((prev) => [newRecord, ...prev].slice(0, 50));
-      recordActivity(`Emotion check-in: ${checkIn.emotionLabel}`, 10);
+
+      setEmotionHistory((prev) => [record, ...prev].slice(0, 50));
+      recordActivity(`Emotion Check-in: ${checkIn.emotionLabel}`, 5);
+
+      // Save to Supabase if authenticated
+      if (caregiverProfile?.id && activeChildProfile?.id) {
+        logEmotionCheckInToDB(record, activeChildProfile.id, caregiverProfile.id);
+      }
     },
-    [recordActivity]
+    [recordActivity, caregiverProfile, activeChildProfile]
   );
 
-  // ==========================================
-  // PART 3 & 4: CUSTOM AAC & FAMILIAR PEOPLE
-  // ==========================================
+  // -------------------------------------------------------------
+  // CUSTOM AAC CARDS & FAMILIAR PEOPLE
+  // -------------------------------------------------------------
   const addCustomAACCard = useCallback(
     async (card: AACCardItem, imageBlobOrDataUrl?: string) => {
       if (imageBlobOrDataUrl) {
-        await storeImageInDB(card.id, imageBlobOrDataUrl);
+        await saveCustomImage(card.id, imageBlobOrDataUrl);
       }
-      setCustomAACCards((prev) => [...prev, card]);
-      showNotice(`Card "${card.text}" added! 🌟`);
+
+      setCustomAACCards((prev) => [card, ...prev]);
+
+      // Save to Supabase if authenticated
+      if (caregiverProfile?.id && activeChildProfile?.id) {
+        const dbId = await saveAACCardToDB(card, activeChildProfile.id, caregiverProfile.id);
+        if (dbId && dbId !== card.id) {
+          setCustomAACCards((prev) =>
+            prev.map((c) => (c.id === card.id ? { ...c, id: dbId } : c))
+          );
+        }
+      }
+
+      showNotice(`Added card: "${card.text}" ♡`);
     },
-    [showNotice]
+    [showNotice, caregiverProfile, activeChildProfile]
   );
 
   const updateCustomAACCard = useCallback(
-    async (updatedCard: AACCardItem, imageBlobOrDataUrl?: string) => {
+    async (card: AACCardItem, imageBlobOrDataUrl?: string) => {
       if (imageBlobOrDataUrl) {
-        await storeImageInDB(updatedCard.id, imageBlobOrDataUrl);
+        await saveCustomImage(card.id, imageBlobOrDataUrl);
       }
       setCustomAACCards((prev) =>
-        prev.map((c) => (c.id === updatedCard.id ? updatedCard : c))
+        prev.map((c) => (c.id === card.id ? card : c))
       );
-      showNotice(`Card "${updatedCard.text}" updated!`);
+
+      if (caregiverProfile?.id && activeChildProfile?.id) {
+        await saveAACCardToDB(card, activeChildProfile.id, caregiverProfile.id);
+      }
+
+      showNotice(`Updated card: "${card.text}" ♡`);
     },
-    [showNotice]
+    [showNotice, caregiverProfile, activeChildProfile]
   );
 
   const deleteCustomAACCard = useCallback(
     async (cardId: string) => {
-      await deleteImageFromDB(cardId);
+      await deleteCustomImage(cardId);
       setCustomAACCards((prev) => prev.filter((c) => c.id !== cardId));
-      showNotice("Custom card removed.");
+
+      if (caregiverProfile?.id) {
+        await deleteAACCardFromDB(cardId, caregiverProfile.id);
+      }
+
+      showNotice("AAC picture card removed.");
     },
-    [showNotice]
+    [showNotice, caregiverProfile]
   );
 
-  const recordCardUsage = useCallback((cardId: string) => {
-    setCustomAACCards((prev) =>
-      prev.map((c) => (c.id === cardId ? { ...c, usageCount: (c.usageCount || 0) + 1 } : c))
-    );
-  }, []);
+  const recordCardUsage = useCallback(
+    (cardId: string) => {
+      setCustomAACCards((prev) =>
+        prev.map((c) =>
+          c.id === cardId ? { ...c, usageCount: (c.usageCount || 0) + 1 } : c
+        )
+      );
+      setChildProfile((prev) => {
+        if (!prev.favoriteCardIds.includes(cardId)) {
+          return {
+            ...prev,
+            favoriteCardIds: [...prev.favoriteCardIds, cardId].slice(0, 15),
+          };
+        }
+        return prev;
+      });
+    },
+    []
+  );
 
-  // ==========================================
-  // PART 5: EMERGENCY ACTIONS
-  // ==========================================
+  // -------------------------------------------------------------
+  // EMERGENCY COMMUNICATION
+  // -------------------------------------------------------------
   const triggerEmergency = useCallback(
     (card: EmergencyCard) => {
       setEmergencyModalOpen(true);
-      const msg = preferences.ttsLanguage === "te" ? card.teluguTitle : card.title;
-      // Emergency alert speaks even if silentMode is active, or prompts loudly
-      speak(msg, preferences.ttsLanguage);
-      recordActivity(`Emergency: ${card.title}`, 0);
+      const isTelugu = preferences.ttsLanguage === "te";
+      const phrase = isTelugu
+        ? `అత్యవసరం: ${card.teluguTitle}! ${card.teluguDetail}`
+        : `Urgent: ${card.title}! ${card.detail}`;
+      speak(phrase, preferences.ttsLanguage);
     },
-    [preferences.ttsLanguage, speak, recordActivity]
+    [speak, preferences.ttsLanguage]
   );
 
-  // ==========================================
-  // PART 6: TIMELINE ROUTINES
-  // ==========================================
+  // -------------------------------------------------------------
+  // VISUAL ROUTINE TIMELINE
+  // -------------------------------------------------------------
   const toggleTimelineStep = useCallback((id: string) => {
-    setTimelineSteps((prev) => {
-      const updated = prev.map((s) => (s.id === id ? { ...s, isCompleted: !s.isCompleted } : s));
-      const allDone = updated.every((s) => s.isCompleted);
-      if (allDone) {
-        showNotice("🌟 All daily timeline steps completed! Wonderful! 🎉");
-      }
-      return updated;
-    });
-  }, [showNotice]);
+    setTimelineSteps((prev) =>
+      prev.map((step) =>
+        step.id === id ? { ...step, completed: !step.completed } : step
+      )
+    );
+  }, []);
 
   const addTimelineStep = useCallback((step: TimelineStepItem) => {
     setTimelineSteps((prev) => [...prev, step]);
@@ -789,55 +1095,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTimelineSteps(steps);
   }, []);
 
-  // ==========================================
-  // PART 3 & 8: CHILD PROFILE
-  // ==========================================
+  // -------------------------------------------------------------
+  // CHILD PROFILE UPDATE
+  // -------------------------------------------------------------
   const updateChildProfile = useCallback(
-    (profile: Partial<ChildProfile>) => {
+    (updates: Partial<ChildProfile>) => {
       setChildProfile((prev) => {
-        const next = { ...prev, ...profile };
-        if (profile.name !== undefined) {
-          setVisitorName(profile.name);
-        }
-        if (profile.preferredLanguage !== undefined) {
-          updatePreferences({ ttsLanguage: profile.preferredLanguage });
+        const next = { ...prev, ...updates };
+        if (updates.name) {
+          setVisitorNameState(updates.name);
+          localStorage.setItem(STORAGE_KEYS.visitorName, updates.name);
         }
         return next;
       });
-      showNotice("Child profile updated ♡");
+
+      if (activeChildProfile) {
+        setActiveChildProfile((prev) => (prev ? { ...prev, ...updates } : null));
+        setChildProfiles((prev) =>
+          prev.map((c) => (c.id === activeChildProfile.id ? { ...c, ...updates } : c))
+        );
+        if (caregiverProfile?.id && activeChildProfile.id) {
+          updateChildProfileInDB(activeChildProfile.id, updates, caregiverProfile.id);
+        }
+      }
     },
-    [setVisitorName, updatePreferences, showNotice]
+    [activeChildProfile, caregiverProfile]
   );
 
-  // ==========================================
-  // PART 10: PRIVACY EXPORT & DELETION
-  // ==========================================
+  // -------------------------------------------------------------
+  // PRIVACY, DATA EXPORT & CLEAR
+  // -------------------------------------------------------------
   const exportAllData = useCallback(() => {
-    const fullReport = {
-      app: "SenseCalm",
-      version: "2.1",
+    const data = {
       exportedAt: new Date().toISOString(),
-      childProfile,
+      caregiverProfile,
+      activeChild: activeChildProfile || childProfile,
+      childProfiles,
       preferences,
       progress,
-      routines,
-      timelineSteps,
       emotionHistory,
-      customAACCards: customAACCards.map(({ imageUrl, ...rest }) => rest), // Export metadata safely
+      customAACCards: customAACCards.map(({ imageUrl, ...rest }) => rest),
+      timelineSteps,
     };
-    const blob = new Blob([JSON.stringify(fullReport, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `sensecalm-complete-export-${todayKey}.json`;
-    link.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `SenseCalm_Data_${getLocalDateKey()}.json`;
+    a.click();
     URL.revokeObjectURL(url);
-    showNotice("Complete data backup downloaded safely.");
-  }, [childProfile, preferences, progress, routines, timelineSteps, emotionHistory, customAACCards, todayKey, showNotice]);
+    showNotice("Your complete Sense Calm data has been exported ♡");
+  }, [
+    caregiverProfile,
+    activeChildProfile,
+    childProfile,
+    childProfiles,
+    preferences,
+    progress,
+    emotionHistory,
+    customAACCards,
+    timelineSteps,
+    showNotice,
+  ]);
 
   const clearAllUserData = useCallback(() => {
     localStorage.clear();
-    setVisitorNameState("");
     setPreferences(defaultPreferences);
     setProgress(defaultProgress);
     setRoutines({});
@@ -845,6 +1169,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEmotionHistory([]);
     setTimelineSteps(initialTimelineSteps);
     setChildProfile(defaultChildProfile);
+    setChildProfiles([]);
+    setActiveChildProfile(null);
+    setCaregiverProfile(null);
+    setIsAuthenticated(false);
+    setIsCaregiverAuthenticated(false);
     showNotice("All local user data has been reset.");
   }, [showNotice]);
 
@@ -877,29 +1206,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
         showNotice,
         notice,
 
-        // New feature accessors
+        // Emotion Assistant
         emotionHistory,
         recordEmotionCheckIn,
 
+        // Custom AAC Cards & Familiar People
         customAACCards,
         addCustomAACCard,
         updateCustomAACCard,
         deleteCustomAACCard,
         recordCardUsage,
 
+        // Emergency Communication
         emergencyModalOpen,
         setEmergencyModalOpen,
         triggerEmergency,
 
+        // Comfort & Breathing
         breathingModalOpen,
         setBreathingModalOpen,
 
+        // Routine Timeline
         timelineSteps,
         toggleTimelineStep,
         addTimelineStep,
         deleteTimelineStep,
         reorderTimelineSteps,
 
+        // Caregiver Gate & Authentication
         childProfile,
         updateChildProfile,
         isCaregiverAuthenticated,
@@ -907,8 +1241,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
         caregiverGateModalOpen,
         setCaregiverGateModalOpen,
 
+        // Supabase Auth & Database
+        isAuthenticated,
+        authLoading,
+        caregiverProfile,
+        childProfiles,
+        activeChildProfile,
+        isSupabaseActive: isSupabaseConfigured,
+        syncStatus,
+        login,
+        register,
+        logout,
+        resetPassword,
+        createChildProfile,
+        selectActiveChild,
+        syncNow,
+
+        // Connectivity
         isOnline,
 
+        // Privacy & Export
         exportAllData,
         clearAllUserData,
       }}

@@ -16,6 +16,10 @@ import RoutinePage from "@/pages/RoutinePage";
 import SensoryPage from "@/pages/SensoryPage";
 import ProgressPage from "@/pages/ProgressPage";
 import CaregiverDashboardPage from "@/pages/CaregiverDashboardPage";
+import LoginPage from "@/pages/auth/LoginPage";
+import RegisterPage from "@/pages/auth/RegisterPage";
+import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
+import ChildProfileSetupPage from "@/pages/auth/ChildProfileSetupPage";
 
 function AppContent() {
   const {
@@ -95,6 +99,14 @@ function AppContent() {
         return <ProgressPage />;
       case "caregiver":
         return <CaregiverDashboardPage onNavigate={handleNavigate} />;
+      case "login":
+        return <LoginPage onNavigate={handleNavigate} />;
+      case "register":
+        return <RegisterPage onNavigate={handleNavigate} />;
+      case "forgot-password":
+        return <ForgotPasswordPage onNavigate={handleNavigate} />;
+      case "child-setup":
+        return <ChildProfileSetupPage onNavigate={handleNavigate} />;
       default:
         return <HomePage onNavigate={handleNavigate} />;
     }

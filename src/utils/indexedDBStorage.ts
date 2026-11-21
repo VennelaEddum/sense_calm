@@ -111,3 +111,8 @@ export async function getAllCustomImages(): Promise<Record<string, string>> {
     return {};
   }
 }
+
+// Aliases for unified imports
+export const saveCustomImage = storeImageInDB;
+export const getCustomImage = getImageFromDB;
+export const deleteCustomImage = deleteImageFromDB;
