@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import { aacCardList, aacCategories } from "@/data/aacData";
 import Confetti from "@/components/Confetti";
 import TTSPlayerControls from "@/components/TTSPlayerControls";
+import CustomAACCardModal from "@/components/CustomAACCardModal";
 import type { AACToken, AACCardItem } from "@/types";
 import {
   Volume2,
@@ -13,6 +14,9 @@ import {
   Sparkles,
   MessageCircle,
   Check,
+  Plus,
+  Star,
+  Users,
 } from "lucide-react";
 
 export default function CommunicationPage() {
@@ -23,15 +27,34 @@ export default function CommunicationPage() {
     playSound,
     showNotice,
     ttsStatus,
+    customAACCards,
+    childProfile,
+    recordCardUsage,
   } = useApp();
 
   const [selectedTokens, setSelectedTokens] = useState<AACToken[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [celebrate, setCelebrate] = useState(false);
   const [lastSpokenText, setLastSpokenText] = useState("");
+  const [isAddCustomOpen, setIsAddCustomOpen] = useState(false);
 
   const isTelugu = preferences.ttsLanguage === "te";
   const isSilent = preferences.silentMode || preferences.muted;
+
+  // Combine standard cards + custom cards (custom cards appear at the top!)
+  const combinedCards = useMemo<AACCardItem[]>(() => {
+    return [...customAACCards, ...aacCardList];
+  }, [customAACCards]);
+
+  // Frequently used & favorites
+  const favoriteCards = useMemo(() => {
+    return combinedCards.filter(
+      (c) =>
+        childProfile.favoriteCardIds.includes(c.id) ||
+        c.familiarRole !== undefined ||
+        (c.usageCount || 0) >= 2
+    );
+  }, [combinedCards, childProfile.favoriteCardIds]);
 
   // Add picture card to sentence builder
   const handleSelectCard = useCallback(
@@ -44,10 +67,12 @@ export default function CommunicationPage() {
         text: card.text,
         teluguText: card.teluguText,
         category: card.category,
+        imageUrl: card.imageUrl,
       };
 
       setSelectedTokens((prev) => [...prev, newToken]);
       setLastSpokenText(phraseToSpeak);
+      recordCardUsage(card.id);
 
       // Play soft pop sound
       playSound("pop");
@@ -65,7 +90,7 @@ export default function CommunicationPage() {
         showNotice(`Selected "${phraseToSpeak}". (Silent Mode is ON)`);
       }
     },
-    [isTelugu, isSilent, preferences, playSound, speak, showNotice]
+    [isTelugu, isSilent, preferences, playSound, speak, showNotice, recordCardUsage]
   );
 
   // Remove individual token
@@ -134,10 +159,13 @@ export default function CommunicationPage() {
   };
 
   // Filter cards by category
-  const filteredCards =
-    activeCategory === "all"
-      ? aacCardList
-      : aacCardList.filter((card) => card.category === activeCategory);
+  const filteredCards = useMemo(() => {
+    if (activeCategory === "all") return combinedCards;
+    if (activeCategory === "favorites") return favoriteCards;
+    if (activeCategory === "familiar")
+      return combinedCards.filter((c) => c.familiarRole !== undefined || c.category === "family");
+    return combinedCards.filter((card) => card.category === activeCategory);
+  }, [activeCategory, combinedCards, favoriteCards]);
 
   // Set of selected base card keys for visual badge
   const selectedCardCount = selectedTokens.reduce<Record<string, number>>((acc, t) => {
@@ -153,6 +181,7 @@ export default function CommunicationPage() {
   return (
     <div className="w-full flex-1 px-4 sm:px-6 py-6 max-w-[1040px] mx-auto">
       <Confetti active={celebrate} />
+      {isAddCustomOpen && <CustomAACCardModal onClose={() => setIsAddCustomOpen(false)} />}
 
       {/* Header Banner */}
       <div className="text-center mb-6">
@@ -231,8 +260,16 @@ export default function CommunicationPage() {
                   <X size={12} />
                 </button>
 
-                {/* Token Emoji */}
-                <span className="text-2xl sm:text-3xl mb-1">{token.emoji}</span>
+                {/* Token Media (Custom Photo or Emoji) */}
+                {token.imageUrl ? (
+                  <img
+                    src={token.imageUrl}
+                    alt={token.text}
+                    className="w-10 h-10 rounded-xl object-cover mb-1 border border-[#E7CCD4]"
+                  />
+                ) : (
+                  <span className="text-2xl sm:text-3xl mb-1">{token.emoji}</span>
+                )}
 
                 {/* Token Label */}
                 <span className="text-xs font-extrabold text-[#55474B] text-center line-clamp-2 leading-tight">
@@ -292,7 +329,6 @@ export default function CommunicationPage() {
             )}
           </div>
 
-          {/* Quick Voice Controls */}
           <TTSPlayerControls
             lastText={lastSpokenText}
             className="w-full sm:w-auto py-1.5 px-2.5 text-xs"
@@ -301,26 +337,73 @@ export default function CommunicationPage() {
         </div>
       </section>
 
-      {/* Category Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin">
-        {aacCategories.map((cat) => (
+      {/* Category Pills & Add Custom Button */}
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin flex-1">
+          {/* Favorites & Familiar People pill */}
+          {favoriteCards.length > 0 && (
+            <button
+              onClick={() => {
+                setActiveCategory("favorites");
+                playSound("pop");
+              }}
+              className={`px-3.5 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap border transition-all flex items-center gap-1.5
+                ${
+                  activeCategory === "favorites"
+                    ? "bg-[#EBCB79] border-[#D9B55A] text-[#694E15] shadow-sm scale-[1.02]"
+                    : "bg-white border-[#E8CCD5] text-[#695E61] hover:bg-[#FCEFF2]"
+                }`}
+            >
+              <Star size={14} className="fill-[#694E15]" />
+              <span>Favorites</span>
+            </button>
+          )}
+
+          {/* Familiar People pill */}
           <button
-            key={cat.key}
             onClick={() => {
-              setActiveCategory(cat.key);
+              setActiveCategory("familiar");
               playSound("pop");
             }}
             className={`px-3.5 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap border transition-all flex items-center gap-1.5
               ${
-                activeCategory === cat.key
-                  ? "bg-[#718D75] border-[#5E7962] text-white shadow-sm scale-[1.02]"
+                activeCategory === "familiar"
+                  ? "bg-[#C9879C] border-[#B87388] text-white shadow-sm scale-[1.02]"
                   : "bg-white border-[#E8CCD5] text-[#695E61] hover:bg-[#FCEFF2]"
               }`}
           >
-            <span>{cat.emoji}</span>
-            <span>{cat.label}</span>
+            <Users size={14} />
+            <span>Familiar People</span>
           </button>
-        ))}
+
+          {aacCategories.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => {
+                setActiveCategory(cat.key);
+                playSound("pop");
+              }}
+              className={`px-3.5 py-2 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap border transition-all flex items-center gap-1.5
+                ${
+                  activeCategory === cat.key
+                    ? "bg-[#718D75] border-[#5E7962] text-white shadow-sm scale-[1.02]"
+                    : "bg-white border-[#E8CCD5] text-[#695E61] hover:bg-[#FCEFF2]"
+                }`}
+            >
+              <span>{cat.emoji}</span>
+              <span>{cat.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Add Custom Card Button */}
+        <button
+          onClick={() => setIsAddCustomOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#EAF5ED] border border-[#B9D5B9] text-[#34593C] text-xs sm:text-sm font-bold hover:bg-[#DCEEE0] transition-all shadow-sm shrink-0"
+        >
+          <Plus size={15} />
+          <span>Add Custom Picture</span>
+        </button>
       </div>
 
       {/* Picture Cards Grid */}
@@ -350,10 +433,25 @@ export default function CommunicationPage() {
                 </span>
               )}
 
-              {/* Big attractive illustration / emoji */}
-              <span className="text-3xl sm:text-4xl mb-2 transition-transform group-hover:scale-110">
-                {card.emoji}
-              </span>
+              {/* Custom Card or Familiar Role Tag */}
+              {card.familiarRole && (
+                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-white/90 border border-[#E0D0D4] text-[9px] font-extrabold text-[#7D5A64]">
+                  {card.familiarRole}
+                </span>
+              )}
+
+              {/* Big Photo / Emoji */}
+              {card.imageUrl ? (
+                <img
+                  src={card.imageUrl}
+                  alt={card.text}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover mb-2 border border-[#E7CCD4] shadow-sm"
+                />
+              ) : (
+                <span className="text-3xl sm:text-4xl mb-2 transition-transform group-hover:scale-110">
+                  {card.emoji}
+                </span>
+              )}
 
               {/* English Label */}
               <strong className={`text-xs sm:text-sm font-extrabold leading-snug ${card.color}`}>
@@ -369,13 +467,12 @@ export default function CommunicationPage() {
         })}
       </div>
 
-      {/* Helpful Hint */}
       <div className="mt-7 text-center text-xs text-[#8A7C80] flex items-center justify-center gap-1.5">
         <Sparkles size={14} className="text-[#C9879C]" />
         <span>
           {isTelugu
-            ? "ప్రతి కార్డు శబ్దం చేస్తుంది. నిశ్శబ్ద మోడ్ (Silent Mode) ఆన్‌లో ఉంటే మ్యూట్ అవుతుంది."
-            : "Tip: Every card speaks instantly. Toggle 'Sound: ON/OFF' in the top bar anytime."}
+            ? "చిత్రాలు సురక్షితంగా బ్రౌజర్‌లో సేవ్ చేయబడతాయి. ఎవరితోనూ భాగస్వామ్యం చేయబడవు."
+            : "Pictures and photos are stored securely inside your browser's IndexedDB and kept completely private."}
         </span>
       </div>
     </div>

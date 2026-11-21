@@ -1,0 +1,19 @@
+{
+  "name": "Sense Calm – Assistive Communication & Comfort",
+  "short_name": "Sense Calm",
+  "description": "Gentle assistive technology app for AAC communication, emotional expression, sensory comfort, daily routines, and learning games.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FCEFF2",
+  "theme_color": "#FCEFF2",
+  "categories": ["education", "health", "lifestyle", "productivity"],
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import Confetti from "@/components/Confetti";
 import TTSPlayerControls from "@/components/TTSPlayerControls";
@@ -10,6 +10,7 @@ import {
   whatHappensNextData,
   everydaySituationData,
 } from "@/data/gamesData";
+import type { GameDifficulty } from "@/types";
 import {
   Gamepad2,
   Check,
@@ -26,6 +27,7 @@ import {
   FastForward,
   Compass,
   Sprout,
+  Sliders,
 } from "lucide-react";
 
 type ActiveGameMode =
@@ -41,6 +43,7 @@ export default function LearningPage() {
     recordAnswer,
     recordGameCompleted,
     preferences,
+    updatePreferences,
     speak,
     playSound,
     showNotice,
@@ -96,6 +99,7 @@ export default function LearningPage() {
 
   const isTelugu = preferences.ttsLanguage === "te";
   const isSilent = preferences.silentMode || preferences.muted;
+  const difficulty = preferences.gameDifficulty || "beginner";
 
   // Trigger celebration
   const triggerCelebration = useCallback(() => {
@@ -105,10 +109,38 @@ export default function LearningPage() {
     }
   }, [preferences.quietMode, preferences.reducedMotion]);
 
+  // Handle difficulty switch directly
+  const handleDifficultyChange = (newDiff: GameDifficulty) => {
+    updatePreferences({ gameDifficulty: newDiff });
+    playSound("pop");
+    showNotice(
+      newDiff === "beginner"
+        ? "Beginner level: 2 large choices & helpful hints."
+        : newDiff === "intermediate"
+        ? "Intermediate level: 3 choices for gentle discovery."
+        : "Advanced level: Full challenge with all choices."
+    );
+  };
+
   // ==========================================
   // GAME 1 HANDLER: PICTURE DETECTIVE
   // ==========================================
   const currentDetective = pictureDetectiveData[detectiveIndex % pictureDetectiveData.length];
+
+  const visibleDetectiveOptions = useMemo(() => {
+    const opts = currentDetective.options;
+    if (difficulty === "beginner") {
+      const correct = opts.find((o) => o.isCorrect);
+      const wrong = opts.filter((o) => !o.isCorrect);
+      return correct && wrong.length > 0 ? [correct, wrong[0]] : opts.slice(0, 2);
+    }
+    if (difficulty === "intermediate") {
+      const correct = opts.find((o) => o.isCorrect);
+      const wrong = opts.filter((o) => !o.isCorrect).slice(0, 2);
+      return correct ? [correct, ...wrong] : opts.slice(0, 3);
+    }
+    return opts;
+  }, [currentDetective, difficulty]);
 
   const handleDetectiveChoice = (optionId: string, isCorrect: boolean, label: string) => {
     if (detectiveFeedback) return;
@@ -140,6 +172,21 @@ export default function LearningPage() {
   // GAME 2 HANDLER: EMOTION EXPLORER
   // ==========================================
   const currentEmotion = emotionExplorerData[emotionIndex % emotionExplorerData.length];
+
+  const visibleEmotionOptions = useMemo(() => {
+    const opts = currentEmotion.options;
+    if (difficulty === "beginner") {
+      const correct = opts.find((o) => o.isCorrect);
+      const wrong = opts.filter((o) => !o.isCorrect);
+      return correct && wrong.length > 0 ? [correct, wrong[0]] : opts.slice(0, 2);
+    }
+    if (difficulty === "intermediate") {
+      const correct = opts.find((o) => o.isCorrect);
+      const wrong = opts.filter((o) => !o.isCorrect).slice(0, 2);
+      return correct ? [correct, ...wrong] : opts.slice(0, 3);
+    }
+    return opts;
+  }, [currentEmotion, difficulty]);
 
   const handleEmotionChoice = (selectedEmotion: string, isCorrect: boolean) => {
     if (emotionFeedback) return;
@@ -231,6 +278,21 @@ export default function LearningPage() {
   // ==========================================
   const currentSequence = whatHappensNextData[sequenceIndex % whatHappensNextData.length];
 
+  const visibleSequenceOptions = useMemo(() => {
+    const opts = currentSequence.options;
+    if (difficulty === "beginner") {
+      const correct = opts.find((o) => o.isCorrect);
+      const wrong = opts.filter((o) => !o.isCorrect);
+      return correct && wrong.length > 0 ? [correct, wrong[0]] : opts.slice(0, 2);
+    }
+    if (difficulty === "intermediate") {
+      const correct = opts.find((o) => o.isCorrect);
+      const wrong = opts.filter((o) => !o.isCorrect).slice(0, 2);
+      return correct ? [correct, ...wrong] : opts.slice(0, 3);
+    }
+    return opts;
+  }, [currentSequence, difficulty]);
+
   const handleSequenceChoice = (optionId: string, isCorrect: boolean, label: string) => {
     if (sequenceFeedback) return;
     setSequenceFeedback({ selectedId: optionId, isCorrect });
@@ -261,6 +323,21 @@ export default function LearningPage() {
   // GAME 5 HANDLER: EVERYDAY SITUATIONS
   // ==========================================
   const currentSituation = everydaySituationData[situationIndex % everydaySituationData.length];
+
+  const visibleSituationOptions = useMemo(() => {
+    const opts = currentSituation.options;
+    if (difficulty === "beginner") {
+      const best = opts.find((o) => o.isBest);
+      const others = opts.filter((o) => !o.isBest);
+      return best && others.length > 0 ? [best, others[0]] : opts.slice(0, 2);
+    }
+    if (difficulty === "intermediate") {
+      const best = opts.find((o) => o.isBest);
+      const others = opts.filter((o) => !o.isBest).slice(0, 2);
+      return best ? [best, ...others] : opts.slice(0, 3);
+    }
+    return opts;
+  }, [currentSituation, difficulty]);
 
   const handleSituationChoice = (
     optionId: string,
@@ -325,7 +402,7 @@ export default function LearningPage() {
 
       {/* Header Banner */}
       <div className="text-center mb-6">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#B9D5B9] rounded-full text-[#385D40] font-bold text-xs sm:text-sm mb-2 shadow-sm">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#B9D5B9] rounded-full text-[#385D40] font-bold text-xs sm:text-sm mb-2 shadow-xs">
           <Gamepad2 size={16} /> Interactive Learning Games
         </div>
         <h1
@@ -342,18 +419,50 @@ export default function LearningPage() {
 
         {/* Live Score & Streak Bar */}
         <div className="mt-4 flex items-center justify-center gap-3 sm:gap-6 flex-wrap">
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-[#D7E4D9] text-xs sm:text-sm font-bold text-[#476D4D] shadow-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-[#D7E4D9] text-xs sm:text-sm font-bold text-[#476D4D] shadow-xs">
             <Trophy size={15} className="text-[#EBCB79]" />
             <span>Points: {progress.totalPoints}</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-[#D7E4D9] text-xs sm:text-sm font-bold text-[#476D4D] shadow-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-[#D7E4D9] text-xs sm:text-sm font-bold text-[#476D4D] shadow-xs">
             <Star size={15} className="text-[#EBCB79] fill-[#EBCB79]" />
             <span>Games Done: {progress.totalGamesCompleted}</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-[#D7E4D9] text-xs sm:text-sm font-bold text-[#476D4D] shadow-sm">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-white rounded-full border border-[#D7E4D9] text-xs sm:text-sm font-bold text-[#476D4D] shadow-xs">
             <span className="text-sm">🔥</span>
-            <span>Streak: {progress.currentStreak} {progress.currentStreak === 1 ? "day" : "days"}</span>
+            <span>
+              Streak: {progress.currentStreak}{" "}
+              {progress.currentStreak === 1 ? "day" : "days"}
+            </span>
           </div>
+        </div>
+
+        {/* Interactive Difficulty Level Selector Bar */}
+        <div className="mt-4 inline-flex items-center gap-1.5 p-1.5 bg-white border border-[#E1D4D7] rounded-full shadow-xs">
+          <span className="text-xs font-bold text-[#776B6E] px-2 flex items-center gap-1">
+            <Sliders size={13} />
+            <span>Level:</span>
+          </span>
+          {(
+            [
+              { id: "beginner", label: "🌱 Beginner (2 Choices)", short: "Beginner" },
+              { id: "intermediate", label: "🌿 Intermediate (3 Choices)", short: "Medium" },
+              { id: "advanced", label: "🌳 Advanced (Full)", short: "Advanced" },
+            ] as const
+          ).map((lvl) => (
+            <button
+              key={lvl.id}
+              onClick={() => handleDifficultyChange(lvl.id)}
+              className={`px-3 py-1 rounded-full text-xs font-extrabold transition-all cursor-pointer
+                ${
+                  difficulty === lvl.id
+                    ? "bg-[#718D75] text-white shadow-xs scale-[1.03]"
+                    : "text-[#6C6063] hover:bg-[#F8EFEF]"
+                }`}
+            >
+              <span className="hidden sm:inline">{lvl.label}</span>
+              <span className="sm:hidden">{lvl.short}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -376,7 +485,7 @@ export default function LearningPage() {
                 setActiveGame(tab.id as ActiveGameMode);
                 playSound("pop");
               }}
-              className={`px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold whitespace-nowrap border-2 transition-all flex items-center gap-2
+              className={`px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold whitespace-nowrap border-2 transition-all flex items-center gap-2 cursor-pointer
                 ${
                   isActive
                     ? "bg-[#718D75] border-[#59755D] text-white shadow-md scale-[1.02]"
@@ -407,12 +516,14 @@ export default function LearningPage() {
                 Clue #{detectiveIndex + 1} of {pictureDetectiveData.length}
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-[#F5DCE3] text-[#8F596B] text-[11px] font-bold capitalize">
-                Level: {currentDetective.level}
+                Level: {difficulty}
               </span>
             </div>
             <button
-              onClick={() => speak(isTelugu ? currentDetective.teluguClue : currentDetective.clue)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2]"
+              onClick={() =>
+                speak(isTelugu ? currentDetective.teluguClue : currentDetective.clue)
+              }
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2] cursor-pointer"
               title="Hear Clue"
             >
               <Volume2 size={14} />
@@ -431,9 +542,17 @@ export default function LearningPage() {
             </h2>
           </div>
 
-          {/* 4 Picture Cards Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            {currentDetective.options.map((option) => {
+          {/* Picture Cards Grid (Filtered by difficulty) */}
+          <div
+            className={`grid gap-3 sm:gap-4 ${
+              visibleDetectiveOptions.length <= 2
+                ? "grid-cols-2 max-w-md mx-auto"
+                : visibleDetectiveOptions.length === 3
+                ? "grid-cols-1 sm:grid-cols-3"
+                : "grid-cols-2 sm:grid-cols-4"
+            }`}
+          >
+            {visibleDetectiveOptions.map((option) => {
               const isSelected = detectiveFeedback?.selectedId === option.id;
               let borderClass = "border-[#EADFE1] bg-white hover:border-[#718D75]";
               if (detectiveFeedback) {
@@ -457,7 +576,7 @@ export default function LearningPage() {
                     )
                   }
                   disabled={detectiveFeedback !== null}
-                  className={`p-4 rounded-[20px] border-2 transition-all flex flex-col items-center justify-center text-center shadow-sm hover:-translate-y-1 ${borderClass}`}
+                  className={`p-4 rounded-[20px] border-2 transition-all flex flex-col items-center justify-center text-center shadow-xs hover:-translate-y-1 cursor-pointer ${borderClass}`}
                 >
                   <span className="text-4xl sm:text-5xl mb-2">{option.emoji}</span>
                   <strong className="text-sm font-extrabold text-[#52494C]">
@@ -481,12 +600,14 @@ export default function LearningPage() {
           {/* Feedback & Next Button */}
           <div className="mt-6 flex items-center justify-between gap-4 pt-4 border-t border-[#EFE5E7]">
             <p className="font-bold text-sm sm:text-base text-[#52494C]">
-              {detectiveFeedback?.isCorrect === true && "🎉 Wonderful detective work! You found the right match! ⭐"}
-              {detectiveFeedback?.isCorrect === false && "Good observation! Let's discover together. ♡"}
+              {detectiveFeedback?.isCorrect === true &&
+                "🎉 Wonderful detective work! You found the right match! ⭐"}
+              {detectiveFeedback?.isCorrect === false &&
+                "Good observation! Let's discover together. ♡"}
             </p>
             <button
               onClick={nextDetective}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0 cursor-pointer"
             >
               <span>Next Clue</span>
               <ArrowRight size={16} />
@@ -508,7 +629,7 @@ export default function LearningPage() {
               onClick={() =>
                 speak(isTelugu ? currentEmotion.teluguScenario : currentEmotion.scenario)
               }
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2]"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2] cursor-pointer"
             >
               <Volume2 size={14} />
               <span>Read Scenario</span>
@@ -525,13 +646,21 @@ export default function LearningPage() {
               "{isTelugu ? currentEmotion.teluguScenario : currentEmotion.scenario}"
             </p>
             <p className="text-xs text-[#8F7D82] mt-2 font-bold uppercase tracking-wider">
-              {isTelugu ? "బెబ్బోకి ఎలా అనిపిస్తుంది? (How does Bebbo feel?)" : "How does Bebbo feel right now?"}
+              {isTelugu
+                ? "బెబ్బోకి ఎలా అనిపిస్తుంది? (How does Bebbo feel?)"
+                : "How does Bebbo feel right now?"}
             </p>
           </div>
 
-          {/* Emotion Choices */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            {currentEmotion.options.map((opt) => {
+          {/* Emotion Choices (Filtered by difficulty) */}
+          <div
+            className={`grid gap-3 sm:gap-4 ${
+              visibleEmotionOptions.length <= 2
+                ? "grid-cols-2 max-w-md mx-auto"
+                : "grid-cols-1 sm:grid-cols-3"
+            }`}
+          >
+            {visibleEmotionOptions.map((opt) => {
               const isSelected = emotionFeedback?.selectedEmotion === opt.emotion;
               let borderClass = "border-[#EADFE1] bg-white hover:border-[#C9879C]";
               if (emotionFeedback) {
@@ -549,14 +678,18 @@ export default function LearningPage() {
                   key={opt.emotion}
                   onClick={() => handleEmotionChoice(opt.emotion, opt.isCorrect)}
                   disabled={emotionFeedback !== null}
-                  className={`p-4 rounded-[20px] border-2 transition-all flex items-center justify-center gap-3 shadow-sm hover:-translate-y-1 ${borderClass}`}
+                  className={`p-4 rounded-[20px] border-2 transition-all flex items-center justify-center gap-3 shadow-xs hover:-translate-y-1 cursor-pointer ${borderClass}`}
                 >
                   <span className="text-3xl">{opt.emoji}</span>
                   <strong className="text-base font-extrabold text-[#52494C]">
                     {opt.emotion}
                   </strong>
-                  {isSelected && opt.isCorrect && <Check size={18} className="text-[#4F7354]" />}
-                  {isSelected && !opt.isCorrect && <X size={18} className="text-[#A64545]" />}
+                  {isSelected && opt.isCorrect && (
+                    <Check size={18} className="text-[#4F7354]" />
+                  )}
+                  {isSelected && !opt.isCorrect && (
+                    <X size={18} className="text-[#A64545]" />
+                  )}
                 </button>
               );
             })}
@@ -565,12 +698,14 @@ export default function LearningPage() {
           {/* Feedback & Next Button */}
           <div className="mt-6 flex items-center justify-between gap-4 pt-4 border-t border-[#EFE5E7]">
             <p className="font-bold text-sm sm:text-base text-[#52494C]">
-              {emotionFeedback?.isCorrect === true && "✨ That's right! You recognized that feeling with kindness! 💖"}
-              {emotionFeedback?.isCorrect === false && "Every feeling is valid! Let's explore together. ♡"}
+              {emotionFeedback?.isCorrect === true &&
+                "✨ That's right! You recognized that feeling with kindness! 💖"}
+              {emotionFeedback?.isCorrect === false &&
+                "Every feeling is valid! Let's explore together. ♡"}
             </p>
             <button
               onClick={nextEmotion}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0 cursor-pointer"
             >
               <span>Next Feeling</span>
               <ArrowRight size={16} />
@@ -597,7 +732,7 @@ export default function LearningPage() {
                       : currentSentencePuzzle.targetSentence
                   )
                 }
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2]"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2] cursor-pointer"
               >
                 <Volume2 size={14} />
                 <span>Hear Target Sentence</span>
@@ -611,10 +746,16 @@ export default function LearningPage() {
               className="text-[#514B4B] font-bold text-lg sm:text-xl"
               style={{ fontFamily: "Georgia, serif" }}
             >
-              {isTelugu ? "క్రింద ఉన్న కార్డులను క్రమంలో అమర్చండి:" : "Arrange the cards in order to build:"}
+              {isTelugu
+                ? "క్రింద ఉన్న కార్డులను క్రమంలో అమర్చండి:"
+                : "Arrange the cards in order to build:"}
             </h3>
             <p className="text-[#718D75] font-extrabold text-base mt-1 italic">
-              "{isTelugu ? currentSentencePuzzle.teluguSentence : currentSentencePuzzle.targetSentence}"
+              "
+              {isTelugu
+                ? currentSentencePuzzle.teluguSentence
+                : currentSentencePuzzle.targetSentence}
+              "
             </p>
           </div>
 
@@ -629,7 +770,7 @@ export default function LearningPage() {
                 <button
                   key={token.id}
                   onClick={() => handleRemoveSentenceToken(token.id)}
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#EAF3EC] border-2 border-[#718D75] text-[#3D5E43] font-extrabold text-sm shadow-sm hover:bg-[#FDEEEE] hover:border-[#D67C7C] hover:text-[#9A3838] transition-all group"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#EAF3EC] border-2 border-[#718D75] text-[#3D5E43] font-extrabold text-sm shadow-xs hover:bg-[#FDEEEE] hover:border-[#D67C7C] hover:text-[#9A3838] transition-all group cursor-pointer"
                   title="Click to remove"
                 >
                   <span className="text-xl">{token.emoji}</span>
@@ -649,13 +790,19 @@ export default function LearningPage() {
                   key={token.id}
                   onClick={() => handleAddSentenceToken(token)}
                   disabled={isUsed}
-                  className={`px-4 py-3 rounded-2xl border-2 font-extrabold text-sm flex items-center gap-2 transition-all shadow-sm
+                  className={`px-4 py-3 rounded-2xl border-2 font-extrabold text-sm flex items-center gap-2 transition-all shadow-xs
                     ${
                       isUsed
                         ? "bg-[#F3EFEF] border-[#E2DADF] text-[#A69B9E] opacity-50 cursor-not-allowed"
                         : "bg-white border-[#E4CAD2] text-[#554549] hover:-translate-y-1 hover:border-[#C9879C] hover:shadow-md cursor-pointer"
                     }`}
                 >
+                  {/* Step Hint for Beginners */}
+                  {difficulty === "beginner" && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-[#E5EFF7] text-[#385B7A] text-[10px] font-bold">
+                      #{token.order + 1}
+                    </span>
+                  )}
                   <span className="text-2xl">{token.emoji}</span>
                   <span>{isTelugu ? token.teluguText : token.text}</span>
                 </button>
@@ -669,7 +816,7 @@ export default function LearningPage() {
               <button
                 onClick={checkSentencePuzzle}
                 disabled={selectedTokens.length === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] disabled:opacity-50 transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] disabled:opacity-50 transition-all cursor-pointer"
               >
                 <Check size={16} />
                 <span>Check Sentence</span>
@@ -680,7 +827,7 @@ export default function LearningPage() {
                   setSentenceFeedback(null);
                   playSound("swoosh");
                 }}
-                className="p-2.5 rounded-full bg-[#F3ECEE] text-[#69565B] hover:bg-[#EBDDE0]"
+                className="p-2.5 rounded-full bg-[#F3ECEE] text-[#69565B] hover:bg-[#EBDDE0] cursor-pointer"
                 title="Reset word cards"
               >
                 <RotateCcw size={16} />
@@ -700,7 +847,7 @@ export default function LearningPage() {
 
             <button
               onClick={nextSentencePuzzle}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#D5E4D8] text-[#556958] font-extrabold text-sm hover:bg-[#F0F7F2] transition-all ml-auto"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-[#D5E4D8] text-[#556958] font-extrabold text-sm hover:bg-[#F0F7F2] transition-all ml-auto cursor-pointer"
             >
               <span>Next Sentence</span>
               <ArrowRight size={16} />
@@ -716,17 +863,22 @@ export default function LearningPage() {
         <div className="p-5 sm:p-7 rounded-[26px] bg-[#FFF8F5] border-2 border-[#E7D6DA] shadow-md animate-float-up">
           <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
             <span className="px-3 py-1 rounded-full bg-[#EBF3EC] text-[#476D4D] text-xs font-extrabold uppercase">
-              Sequence Story #{sequenceIndex + 1}: {isTelugu ? currentSequence.teluguTitle : currentSequence.title}
+              Sequence Story #{sequenceIndex + 1}:{" "}
+              {isTelugu ? currentSequence.teluguTitle : currentSequence.title}
             </span>
             <button
               onClick={() =>
                 speak(
                   isTelugu
-                    ? `${currentSequence.steps.map((s) => s.teluguLabel).join(", ")}. తరువాత ఏమి జరుగుతుంది?`
-                    : `${currentSequence.steps.map((s) => s.label).join(", ")}. What happens next?`
+                    ? `${currentSequence.steps
+                        .map((s) => s.teluguLabel)
+                        .join(", ")}. తరువాత ఏమి జరుగుతుంది?`
+                    : `${currentSequence.steps
+                        .map((s) => s.label)
+                        .join(", ")}. What happens next?`
                 )
               }
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2]"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2] cursor-pointer"
             >
               <Volume2 size={14} />
               <span>Read Story Steps</span>
@@ -738,7 +890,7 @@ export default function LearningPage() {
             {currentSequence.steps.map((step) => (
               <div
                 key={step.stepNumber}
-                className="flex items-center gap-2 sm:gap-3 p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-[#E3D4D7] shadow-sm min-w-[130px] max-w-[200px] text-center flex-col"
+                className="flex items-center gap-2 sm:gap-3 p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-[#E3D4D7] shadow-xs min-w-[130px] max-w-[200px] text-center flex-col"
               >
                 <span className="w-6 h-6 rounded-full bg-[#718D75] text-white text-xs font-extrabold flex items-center justify-center">
                   {step.stepNumber}
@@ -766,9 +918,15 @@ export default function LearningPage() {
             {isTelugu ? "సరైన తదుపరి చర్యను ఎంచుకోండి:" : "Choose what happens next:"}
           </h4>
 
-          {/* Candidate Options */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-            {currentSequence.options.map((opt) => {
+          {/* Candidate Options (Filtered by difficulty) */}
+          <div
+            className={`grid gap-3 sm:gap-4 ${
+              visibleSequenceOptions.length <= 2
+                ? "grid-cols-2 max-w-md mx-auto"
+                : "grid-cols-1 sm:grid-cols-3"
+            }`}
+          >
+            {visibleSequenceOptions.map((opt) => {
               const isSelected = sequenceFeedback?.selectedId === opt.id;
               let borderClass = "border-[#EADFE1] bg-white hover:border-[#718D75]";
               if (sequenceFeedback) {
@@ -792,7 +950,7 @@ export default function LearningPage() {
                     )
                   }
                   disabled={sequenceFeedback !== null}
-                  className={`p-4 rounded-[20px] border-2 transition-all flex flex-col items-center justify-center text-center shadow-sm hover:-translate-y-1 ${borderClass}`}
+                  className={`p-4 rounded-[20px] border-2 transition-all flex flex-col items-center justify-center text-center shadow-xs hover:-translate-y-1 cursor-pointer ${borderClass}`}
                 >
                   <span className="text-3xl sm:text-4xl mb-1.5">{opt.emoji}</span>
                   <strong className="text-xs sm:text-sm font-extrabold text-[#52494C]">
@@ -816,12 +974,14 @@ export default function LearningPage() {
           {/* Sequence Footer */}
           <div className="mt-6 flex items-center justify-between gap-4 pt-4 border-t border-[#EFE5E7]">
             <p className="font-bold text-sm sm:text-base text-[#52494C]">
-              {sequenceFeedback?.isCorrect === true && "🌟 Brilliant! You followed the story steps perfectly! 🌸"}
-              {sequenceFeedback?.isCorrect === false && "Nice try! Every day has its little steps. ♡"}
+              {sequenceFeedback?.isCorrect === true &&
+                "🌟 Brilliant! You followed the story steps perfectly! 🌸"}
+              {sequenceFeedback?.isCorrect === false &&
+                "Nice try! Every day has its little steps. ♡"}
             </p>
             <button
               onClick={nextSequence}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0 cursor-pointer"
             >
               <span>Next Sequence</span>
               <ArrowRight size={16} />
@@ -847,7 +1007,7 @@ export default function LearningPage() {
                     : currentSituation.situation
                 )
               }
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2]"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#718D75] bg-white px-3 py-1.5 rounded-full border border-[#D5E4D8] hover:bg-[#F0F7F2] cursor-pointer"
             >
               <Volume2 size={14} />
               <span>Read Situation</span>
@@ -864,13 +1024,21 @@ export default function LearningPage() {
               "{isTelugu ? currentSituation.teluguSituation : currentSituation.situation}"
             </h3>
             <p className="text-xs text-[#8F7D82] mt-2 font-bold uppercase tracking-wider">
-              {isTelugu ? "మీరు ఏమి చేస్తారు? (What would you do?)" : "What is a gentle and helpful thing to do?"}
+              {isTelugu
+                ? "మీరు ఏమి చేస్తారు? (What would you do?)"
+                : "What is a gentle and helpful thing to do?"}
             </p>
           </div>
 
-          {/* Situation Response Options */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {currentSituation.options.map((opt) => {
+          {/* Situation Response Options (Filtered by difficulty) */}
+          <div
+            className={`grid gap-3 sm:gap-4 ${
+              visibleSituationOptions.length <= 2
+                ? "grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto"
+                : "grid-cols-1 sm:grid-cols-2"
+            }`}
+          >
+            {visibleSituationOptions.map((opt) => {
               const isSelected = situationFeedback?.optionId === opt.id;
               let borderClass = "border-[#EADFE1] bg-white hover:border-[#718D75]";
               if (situationFeedback) {
@@ -895,7 +1063,7 @@ export default function LearningPage() {
                     )
                   }
                   disabled={situationFeedback !== null}
-                  className={`p-4 sm:p-5 rounded-[20px] border-2 transition-all flex items-center gap-3 text-left shadow-sm hover:-translate-y-1 ${borderClass}`}
+                  className={`p-4 sm:p-5 rounded-[20px] border-2 transition-all flex items-center gap-3 text-left shadow-xs hover:-translate-y-1 cursor-pointer ${borderClass}`}
                 >
                   <span className="text-3xl sm:text-4xl shrink-0">{opt.emoji}</span>
                   <div className="flex-1">
@@ -903,12 +1071,18 @@ export default function LearningPage() {
                       {isTelugu ? opt.teluguResponse : opt.response}
                     </strong>
                     {isSelected && (
-                      <p className={`text-xs mt-1 font-semibold ${opt.isBest ? "text-[#4F7354]" : "text-[#A64545]"}`}>
+                      <p
+                        className={`text-xs mt-1 font-semibold ${
+                          opt.isBest ? "text-[#4F7354]" : "text-[#A64545]"
+                        }`}
+                      >
                         {opt.feedback}
                       </p>
                     )}
                   </div>
-                  {isSelected && opt.isBest && <Check size={20} className="text-[#4F7354] shrink-0" />}
+                  {isSelected && opt.isBest && (
+                    <Check size={20} className="text-[#4F7354] shrink-0" />
+                  )}
                 </button>
               );
             })}
@@ -917,12 +1091,14 @@ export default function LearningPage() {
           {/* Footer & Next */}
           <div className="mt-6 flex items-center justify-between gap-4 pt-4 border-t border-[#EFE5E7]">
             <p className="font-bold text-sm sm:text-base text-[#52494C]">
-              {situationFeedback?.isBest === true && "💖 Excellent social care! You handled that situation wonderfully! ⭐"}
-              {situationFeedback?.isBest === false && "It's always okay to take a moment and ask someone for help. ♡"}
+              {situationFeedback?.isBest === true &&
+                "💖 Excellent social care! You handled that situation wonderfully! ⭐"}
+              {situationFeedback?.isBest === false &&
+                "It's always okay to take a moment and ask someone for help. ♡"}
             </p>
             <button
               onClick={nextSituation}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all shrink-0 cursor-pointer"
             >
               <span>Next Challenge</span>
               <ArrowRight size={16} />
@@ -950,10 +1126,10 @@ export default function LearningPage() {
                   setFundFeedback(null);
                   playSound("pop");
                 }}
-                className={`px-4 py-2 rounded-full border-2 font-bold transition-all text-xs sm:text-sm
+                className={`px-4 py-2 rounded-full border-2 font-bold transition-all text-xs sm:text-sm cursor-pointer
                   ${
                     fundTopic === t.key
-                      ? "border-[#718D75] bg-[#EAF5ED] text-[#34593C] shadow-sm"
+                      ? "border-[#718D75] bg-[#EAF5ED] text-[#34593C] shadow-xs"
                       : "border-[#E8CAD2] bg-white text-[#5B5555] hover:bg-[#FBF4F6]"
                   }`}
               >
@@ -977,10 +1153,13 @@ export default function LearningPage() {
               {fundQ.choices.map((choice, idx) => {
                 const isCorrect = idx === fundQ.answer;
                 const isSelected = fundFeedback?.selectedIndex === idx;
-                let choiceClass = "border-[#E7DEDE] bg-white text-[#514B4B] hover:bg-[#F9F5F4]";
+                let choiceClass =
+                  "border-[#E7DEDE] bg-white text-[#514B4B] hover:bg-[#F9F5F4]";
                 if (fundFeedback) {
-                  if (isCorrect) choiceClass = "border-[#7DB5A4] bg-[#E6F4ED] text-[#315C55]";
-                  else if (isSelected) choiceClass = "border-[#D99B9B] bg-[#F8EEEE] text-[#77565A]";
+                  if (isCorrect)
+                    choiceClass = "border-[#7DB5A4] bg-[#E6F4ED] text-[#315C55]";
+                  else if (isSelected)
+                    choiceClass = "border-[#D99B9B] bg-[#F8EEEE] text-[#77565A]";
                   else choiceClass = "border-[#E7DEDE] bg-white text-[#AAA] opacity-60";
                 }
 
@@ -989,10 +1168,12 @@ export default function LearningPage() {
                     key={idx}
                     onClick={() => handleFundAnswer(idx)}
                     disabled={fundFeedback !== null}
-                    className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left font-bold transition-all ${choiceClass}`}
+                    className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 text-left font-bold transition-all cursor-pointer ${choiceClass}`}
                   >
                     <span className="text-base sm:text-lg">{choice}</span>
-                    {fundFeedback && isCorrect && <Check size={20} className="text-[#5B9B7E]" />}
+                    {fundFeedback && isCorrect && (
+                      <Check size={20} className="text-[#5B9B7E]" />
+                    )}
                     {fundFeedback && isSelected && !isCorrect && (
                       <X size={20} className="text-[#C47878]" />
                     )}
@@ -1010,7 +1191,7 @@ export default function LearningPage() {
             </p>
             <button
               onClick={nextFundQuestion}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#718D75] text-white font-extrabold text-sm hover:bg-[#5E7962] transition-all cursor-pointer"
             >
               <span>Next Question</span>
               <ArrowRight size={16} />
