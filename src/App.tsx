@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { AppProvider, useApp } from "@/context/AppContext";
 import type { ModuleName } from "@/types";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { SplashScreen } from "@capacitor/splash-screen";
 import NavBar from "@/components/NavBar";
 import NoticeToast from "@/components/NoticeToast";
 import WelcomeScreen from "@/components/WelcomeScreen";
@@ -29,6 +33,8 @@ function AppContent() {
     setBreathingModalOpen,
     caregiverGateModalOpen,
     setCaregiverGateModalOpen,
+    emergencyModalOpen,
+    setEmergencyModalOpen,
     setIsCaregiverAuthenticated,
   } = useApp();
 
@@ -47,6 +53,58 @@ function AppContent() {
     classList.toggle("reduced-motion", preferences.reducedMotion);
     classList.toggle("high-contrast", preferences.highContrast);
   }, [preferences.quietMode, preferences.reducedMotion, preferences.highContrast]);
+
+  // Native Android back-button handling & splash screen
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    // Auto-hide native splash after app initializes
+    SplashScreen.hide().catch(() => {});
+
+    // Hardware back button handler for Android
+    const backListener = CapApp.addListener("backButton", () => {
+      if (emergencyModalOpen) {
+        setEmergencyModalOpen(false);
+      } else if (breathingModalOpen) {
+        setBreathingModalOpen(false);
+      } else if (caregiverGateModalOpen) {
+        setCaregiverGateModalOpen(false);
+      } else if (page !== "home") {
+        setPage("home");
+      } else {
+        CapApp.exitApp();
+      }
+    });
+
+    return () => {
+      backListener.then((handle) => handle.remove()).catch(() => {});
+    };
+  }, [
+    emergencyModalOpen,
+    breathingModalOpen,
+    caregiverGateModalOpen,
+    page,
+    setEmergencyModalOpen,
+    setBreathingModalOpen,
+    setCaregiverGateModalOpen,
+  ]);
+
+  // Dynamic Status Bar coloring to match active sensory theme
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const themeColors: Record<string, { color: string; style: Style }> = {
+      default: { color: "#FCEFF2", style: Style.Dark },
+      sage: { color: "#EFF5F0", style: Style.Dark },
+      cream: { color: "#FAF7F0", style: Style.Dark },
+      night: { color: "#1E232A", style: Style.Light },
+      sky: { color: "#EDF5FA", style: Style.Dark },
+    };
+
+    const current = themeColors[preferences.sensoryTheme] || themeColors.default;
+    StatusBar.setBackgroundColor({ color: current.color }).catch(() => {});
+    StatusBar.setStyle({ style: current.style }).catch(() => {});
+  }, [preferences.sensoryTheme]);
 
   const handleNavigate = (m: ModuleName) => {
     setPage(m);
