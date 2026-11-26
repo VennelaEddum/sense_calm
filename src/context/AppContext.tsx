@@ -29,6 +29,12 @@ import {
   isTeluguVoiceAvailable,
 } from "@/utils/audioManager";
 import {
+  speakUnified,
+  stopUnified,
+  openAndroidTtsSettings,
+  initNativeTtsListeners,
+} from "@/utils/nativeTTS";
+import {
   saveCustomImage,
   getCustomImage,
   getAllCustomImages,
@@ -137,10 +143,15 @@ interface AppContextValue {
   toggleRoutine: (dateKey: string, index: number) => void;
   saveRoutines: (dateKey: string, indices: number[]) => void;
   todayKey: string;
-  speak: (text: string, langOverride?: TTSLanguage) => void;
+  speak: (text: string, langOverride?: TTSLanguage, forceSpeak?: boolean) => void;
   pauseSpeech: () => void;
   resumeSpeech: () => void;
   stopSpeech: () => void;
+  repeatSpeech: () => void;
+  openSystemTtsSettings: () => Promise<boolean>;
+  voiceDiagnosticsOpen: boolean;
+  setVoiceDiagnosticsOpen: (open: boolean) => void;
+  lastVoiceError: string | null;
   ttsStatus: TTSStatus;
   currentUtteranceText: string;
   isTeluguSupported: boolean;
@@ -320,6 +331,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUtteranceText, setCurrentUtteranceText] = useState<string>("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [teluguAvailable, setTeluguAvailable] = useState<boolean>(false);
+  const [voiceDiagnosticsOpen, setVoiceDiagnosticsOpen] = useState(false);
+  const [lastVoiceError, setLastVoiceError] = useState<string | null>(null);
+  const lastUtteranceTextRef = useRef<string>("Hello! Welcome to Sense Calm.");
+  const lastUtteranceLangRef = useRef<TTSLanguage>("en");
 
   // Modals & Navigation Barriers
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
@@ -385,6 +400,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     updateVoices();
     window.speechSynthesis.onvoiceschanged = updateVoices;
+  }, []);
+
+  // Initialize native Android TTS listeners
+  useEffect(() => {
+    initNativeTtsListeners(
+      (status, utteranceText) => {
+        setTtsStatus(status);
+        setCurrentUtteranceText(utteranceText || "");
+      },
+      (errMsg) => {
+        setLastVoiceError(errMsg);
+      }
+    );
   }, []);
 
   // Sync ambient sounds with preferences
@@ -726,9 +754,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Centralized stop speech
   const stopSpeech = useCallback(() => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopUnified().catch(() => {});
     setTtsStatus("idle");
     setCurrentUtteranceText("");
     activeUtteranceRef.current = null;
@@ -737,15 +763,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const pauseSpeech = useCallback(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.pause();
-      setTtsStatus("paused");
     }
+    setTtsStatus("paused");
   }, []);
 
   const resumeSpeech = useCallback(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.resume();
-      setTtsStatus("speaking");
     }
+    setTtsStatus("speaking");
   }, []);
 
   const updatePreferences = useCallback(
@@ -812,52 +838,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const speak = useCallback(
-    (text: string, langOverride?: TTSLanguage) => {
-      if (preferences.silentMode || preferences.muted || !preferences.speechEnabled) {
+    (text: string, langOverride?: TTSLanguage, forceSpeak?: boolean) => {
+      if (!forceSpeak && (preferences.silentMode || preferences.muted || !preferences.speechEnabled)) {
         return;
       }
-      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-        return;
-      }
-
-      window.speechSynthesis.cancel();
 
       const lang = langOverride || preferences.ttsLanguage || "en";
-      const utterance = new SpeechSynthesisUtterance(text);
-      activeUtteranceRef.current = utterance;
+      lastUtteranceTextRef.current = text;
+      lastUtteranceLangRef.current = lang;
+      setLastVoiceError(null);
 
-      utterance.rate = preferences.ttsRate || 0.88;
-      utterance.pitch = preferences.ttsPitch || 1.0;
+      // Cancel previous speech to prevent overlapping audio
+      stopUnified().catch(() => {});
 
-      if (preferences.ttsVoiceURI && voices.length > 0) {
-        const found = voices.find((v) => v.voiceURI === preferences.ttsVoiceURI);
-        if (found) utterance.voice = found;
-      }
+      setTtsStatus("playing");
+      setCurrentUtteranceText(text);
 
-      utterance.lang = lang === "te" ? "te-IN" : "en-US";
-
-      utterance.onstart = () => {
-        setTtsStatus("playing");
-        setCurrentUtteranceText(text);
-      };
-
-      utterance.onend = () => {
-        setTtsStatus("idle");
-        setCurrentUtteranceText("");
-        activeUtteranceRef.current = null;
-      };
-
-      utterance.onerror = (e) => {
-        console.warn("Speech synthesis notice:", e);
-        setTtsStatus("idle");
-        setCurrentUtteranceText("");
-        activeUtteranceRef.current = null;
-      };
-
-      window.speechSynthesis.speak(utterance);
+      speakUnified(
+        text,
+        lang,
+        preferences.ttsRate || 0.88,
+        preferences.ttsPitch || 1.0,
+        preferences.ttsVoiceURI,
+        {
+          onStart: () => {
+            setTtsStatus("playing");
+            setCurrentUtteranceText(text);
+          },
+          onEnd: () => {
+            setTtsStatus("idle");
+            setCurrentUtteranceText("");
+          },
+          onError: (errMsg) => {
+            setTtsStatus("idle");
+            setCurrentUtteranceText("");
+            setLastVoiceError(errMsg);
+            if (lang === "te" && (errMsg.includes("TELUGU") || errMsg.includes("missing"))) {
+              showNotice("Telugu voice data missing on this device. Install voice data in Android Text-to-Speech settings.");
+            }
+          },
+        }
+      ).then((res) => {
+        if (!res.success && res.error === "TELUGU_VOICE_MISSING") {
+          setTtsStatus("idle");
+          setCurrentUtteranceText("");
+          setLastVoiceError(res.message || "Telugu voice package missing");
+          showNotice("Telugu voice is not installed on this Android device. You can install it in Android Text-to-Speech settings.");
+        }
+      });
     },
-    [preferences, voices]
+    [preferences, showNotice]
   );
+
+  const repeatSpeech = useCallback(() => {
+    const textToRepeat = lastUtteranceTextRef.current || "Hello! Welcome to Sense Calm.";
+    const langToRepeat = lastUtteranceLangRef.current || preferences.ttsLanguage || "en";
+    speak(textToRepeat, langToRepeat);
+  }, [speak, preferences.ttsLanguage]);
+
+  const openSystemTtsSettings = useCallback(async () => {
+    return await openAndroidTtsSettings();
+  }, []);
 
   const recordAnswer = useCallback((isCorrect: boolean) => {
     setProgress((prev) => ({
@@ -1198,6 +1239,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         pauseSpeech,
         resumeSpeech,
         stopSpeech,
+        repeatSpeech,
+        openSystemTtsSettings,
+        voiceDiagnosticsOpen,
+        setVoiceDiagnosticsOpen,
+        lastVoiceError,
         ttsStatus,
         currentUtteranceText,
         isTeluguSupported: teluguAvailable,

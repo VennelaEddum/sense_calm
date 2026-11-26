@@ -14,6 +14,7 @@ export default function TTSPlayerControls({
 }: TTSPlayerControlsProps) {
   const {
     speak,
+    repeatSpeech,
     pauseSpeech,
     resumeSpeech,
     stopSpeech,
@@ -27,6 +28,7 @@ export default function TTSPlayerControls({
 
   const isSilent = preferences.silentMode || preferences.muted;
   const activeText = currentUtteranceText || lastText || "";
+  const isPlaying = ttsStatus === "playing" || (ttsStatus as string) === "speaking";
 
   const handlePlayReplay = () => {
     if (isSilent) {
@@ -35,6 +37,8 @@ export default function TTSPlayerControls({
     }
     if (activeText) {
       speak(activeText);
+    } else {
+      repeatSpeech();
     }
   };
 
@@ -42,7 +46,7 @@ export default function TTSPlayerControls({
     const nextLang = preferences.ttsLanguage === "en" ? "te" : "en";
     updatePreferences({ ttsLanguage: nextLang });
     if (nextLang === "te" && !isTeluguSupported) {
-      showNotice("Telugu voice not found in browser. Will use best natural Indian voice.");
+      showNotice("Telugu voice data might need to be installed in Android settings.");
     } else {
       showNotice(nextLang === "te" ? "Voice set to Telugu (తెలుగు) 🇮🇳" : "Voice set to English 🇬🇧/🇺🇸");
     }
@@ -57,7 +61,7 @@ export default function TTSPlayerControls({
       <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
         <div
           className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-            ttsStatus === "speaking"
+            isPlaying
               ? "bg-[#D8EADB] text-[#4C7550] animate-pulse"
               : isSilent
               ? "bg-[#FBEBE7] text-[#B85741]"
@@ -68,7 +72,7 @@ export default function TTSPlayerControls({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold text-[#554C4F] truncate">
-            {ttsStatus === "speaking" && "Speaking now..."}
+            {isPlaying && "Speaking now..."}
             {ttsStatus === "paused" && "Paused"}
             {ttsStatus === "idle" && (activeText ? `Ready: "${activeText.slice(0, 28)}..."` : "Speech Player")}
           </p>
@@ -82,19 +86,28 @@ export default function TTSPlayerControls({
         {/* Play / Replay button */}
         <button
           onClick={handlePlayReplay}
-          disabled={!activeText}
-          className="w-8 h-8 rounded-full bg-[#718D75] text-white flex items-center justify-center transition-all hover:bg-[#5C7760] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-8 h-8 rounded-full bg-[#718D75] text-white flex items-center justify-center transition-all hover:bg-[#5C7760] cursor-pointer"
           title="Play / Replay"
           aria-label="Play or replay text"
         >
           {ttsStatus === "idle" ? <Play size={14} className="ml-0.5" /> : <RotateCcw size={14} />}
         </button>
 
+        {/* Repeat button */}
+        <button
+          onClick={repeatSpeech}
+          className="w-8 h-8 rounded-full bg-[#F3EBF0] text-[#7E576B] flex items-center justify-center transition-all hover:bg-[#E8D9E3] cursor-pointer"
+          title="Repeat last spoken message"
+          aria-label="Repeat last speech"
+        >
+          <RotateCcw size={13} />
+        </button>
+
         {/* Pause button */}
-        {ttsStatus === "speaking" && (
+        {isPlaying && (
           <button
             onClick={pauseSpeech}
-            className="w-8 h-8 rounded-full bg-[#EBCB79] text-[#694E15] flex items-center justify-center transition-all hover:bg-[#DDBB65]"
+            className="w-8 h-8 rounded-full bg-[#EBCB79] text-[#694E15] flex items-center justify-center transition-all hover:bg-[#DDBB65] cursor-pointer"
             title="Pause speech"
             aria-label="Pause speech"
           >
@@ -106,7 +119,7 @@ export default function TTSPlayerControls({
         {ttsStatus === "paused" && (
           <button
             onClick={resumeSpeech}
-            className="w-8 h-8 rounded-full bg-[#718D75] text-white flex items-center justify-center transition-all hover:bg-[#5C7760]"
+            className="w-8 h-8 rounded-full bg-[#718D75] text-white flex items-center justify-center transition-all hover:bg-[#5C7760] cursor-pointer"
             title="Resume speech"
             aria-label="Resume speech"
           >
@@ -118,7 +131,7 @@ export default function TTSPlayerControls({
         <button
           onClick={stopSpeech}
           disabled={ttsStatus === "idle"}
-          className="w-8 h-8 rounded-full bg-[#E5D7DA] text-[#6C555C] flex items-center justify-center transition-all hover:bg-[#D9C4C8] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-8 h-8 rounded-full bg-[#E5D7DA] text-[#6C555C] flex items-center justify-center transition-all hover:bg-[#D9C4C8] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           title="Stop speech"
           aria-label="Stop speech"
         >
@@ -129,7 +142,7 @@ export default function TTSPlayerControls({
         {showLanguageToggle && (
           <button
             onClick={handleToggleLang}
-            className={`px-2.5 py-1 rounded-full border text-xs font-bold flex items-center gap-1 transition-all ${
+            className={`px-2.5 py-1 rounded-full border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
               preferences.ttsLanguage === "te"
                 ? "bg-[#F5DCE3] border-[#E2BCC7] text-[#7A4B5A]"
                 : "bg-[#F5F2F0] border-[#E0D7D5] text-[#61595B]"

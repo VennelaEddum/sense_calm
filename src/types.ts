@@ -112,6 +112,20 @@ export interface AchievementBadge {
 
 export type TTSStatus = "idle" | "playing" | "paused" | "stopped";
 
+export interface VoiceDiagnosticsInfo {
+  platform: "android" | "browser";
+  selectedLanguage: TTSLanguage;
+  ttsEngineAvailable: boolean;
+  engineName: string;
+  isEnglishAvailable: boolean;
+  isTeluguAvailable: boolean;
+  voicesCount: number;
+  currentStatus: TTSStatus;
+  lastSpokenText: string;
+  lastSpokenLanguage: string;
+  lastError: string | null;
+}
+
 // ==========================================
 // PART 1: EMOTION ASSISTANT INTERFACES
 // ==========================================

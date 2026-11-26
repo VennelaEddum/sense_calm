@@ -11,6 +11,7 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import EmergencyModal from "@/components/EmergencyModal";
 import BreathingExercise from "@/components/BreathingExercise";
 import CaregiverGateModal from "@/components/CaregiverGateModal";
+import VoiceDiagnosticsModal from "@/components/VoiceDiagnosticsModal";
 import HomePage from "@/pages/HomePage";
 import ActivitiesPage from "@/pages/ActivitiesPage";
 import CommunicationPage from "@/pages/CommunicationPage";
@@ -35,6 +36,8 @@ function AppContent() {
     setCaregiverGateModalOpen,
     emergencyModalOpen,
     setEmergencyModalOpen,
+    voiceDiagnosticsOpen,
+    setVoiceDiagnosticsOpen,
     setIsCaregiverAuthenticated,
   } = useApp();
 
@@ -207,6 +210,13 @@ function AppContent() {
 
       {breathingModalOpen && (
         <BreathingExercise onClose={() => setBreathingModalOpen(false)} />
+      )}
+
+      {voiceDiagnosticsOpen && (
+        <VoiceDiagnosticsModal
+          isOpen={voiceDiagnosticsOpen}
+          onClose={() => setVoiceDiagnosticsOpen(false)}
+        />
       )}
 
       {caregiverGateModalOpen && (

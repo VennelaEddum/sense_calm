@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useApp } from "@/context/AppContext";
 import CustomAACCardModal from "@/components/CustomAACCardModal";
+import VoiceDiagnosticsModal from "@/components/VoiceDiagnosticsModal";
 import type { GameDifficulty, TimelineStepItem, AACCardItem, ModuleName } from "@/types";
 import {
   ShieldCheck,
@@ -24,9 +25,10 @@ import {
   RefreshCw,
   UserPlus,
   Check,
+  Volume2,
 } from "lucide-react";
 
-type CaregiverTab = "profile" | "aac" | "learning" | "routine" | "insights";
+type CaregiverTab = "profile" | "aac" | "learning" | "routine" | "insights" | "voice";
 
 interface CaregiverDashboardPageProps {
   onNavigate?: (m: ModuleName) => void;
@@ -223,6 +225,7 @@ export default function CaregiverDashboardPage({
           { key: "learning", label: "Learning & Difficulty", icon: Gamepad2 },
           { key: "routine", label: "Routine Timeline", icon: CalendarCheck },
           { key: "insights", label: "History & Insights", icon: BarChart3 },
+          { key: "voice", label: "Voice Diagnostics", icon: Volume2 },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -731,6 +734,15 @@ export default function CaregiverDashboardPage({
               </span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ========================================================
+          TAB 6: VOICE & TEXT-TO-SPEECH DIAGNOSTICS
+      ======================================================== */}
+      {activeTab === "voice" && (
+        <div className="p-5 sm:p-7 rounded-[26px] bg-white border-2 border-[#EADFE0] shadow-xs animate-float-up">
+          <VoiceDiagnosticsModal isInline={true} />
         </div>
       )}
     </div>

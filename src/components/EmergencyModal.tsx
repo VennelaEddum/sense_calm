@@ -30,8 +30,8 @@ export default function EmergencyModal() {
     setSelectedEmergency(card);
     playSound("pop");
     const phrase = isTelugu ? `${card.teluguTitle}. ${card.teluguDetail}` : `${card.title}. ${card.detail}`;
-    // Speak immediately
-    speak(phrase, preferences.ttsLanguage);
+    // Speak immediately - emergency announcement can bypass silent mode
+    speak(phrase, preferences.ttsLanguage, true);
   };
 
   const handleClose = () => {
@@ -89,7 +89,8 @@ export default function EmergencyModal() {
                     isTelugu
                       ? `${selectedEmergency.teluguTitle}. ${selectedEmergency.teluguDetail}`
                       : `${selectedEmergency.title}. ${selectedEmergency.detail}`,
-                    preferences.ttsLanguage
+                    preferences.ttsLanguage,
+                    true
                   )
                 }
                 className="w-full sm:w-auto px-6 py-3.5 rounded-full bg-[#E63946] text-white font-extrabold text-base shadow-md hover:bg-[#CC2A37] flex items-center justify-center gap-2"
